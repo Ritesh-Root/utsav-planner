@@ -177,7 +177,7 @@ export default function TimelinePanel({ plan, today, update, refine }: PanelProp
                       })}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={`Add ${task.title} to Google Calendar (opens in a new tab)`}
+                      aria-label={`Add to Google Calendar: ${task.title} (opens in a new tab)`}
                     >
                       Add to Google Calendar
                     </a>
@@ -196,7 +196,7 @@ export default function TimelinePanel({ plan, today, update, refine }: PanelProp
             Run sheet
           </h2>
           {days.map(([day, items]) => (
-            <section key={day} aria-label={plan.brief.days > 1 ? `Day ${day}` : 'Event day'}>
+            <div key={day}>
               {plan.brief.days > 1 && <h3 className="phase-title">Day {day}</h3>}
               <ul className="rows">
                 {items.map((item) => (
@@ -206,7 +206,7 @@ export default function TimelinePanel({ plan, today, update, refine }: PanelProp
                   </li>
                 ))}
               </ul>
-            </section>
+            </div>
           ))}
           <button
             type="button"

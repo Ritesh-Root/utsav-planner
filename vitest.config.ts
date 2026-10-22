@@ -10,7 +10,11 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
-          include: ['tests/shared/**/*.test.ts', 'tests/server/**/*.test.ts'],
+          include: [
+            'tests/shared/**/*.test.ts',
+            'tests/server/**/*.test.ts',
+            'tests/styles/**/*.test.ts',
+          ],
           setupFiles: ['tests/setup/node.ts'],
         },
       },

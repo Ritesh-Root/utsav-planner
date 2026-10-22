@@ -12,6 +12,7 @@
     "src/shared",
     "tests/server",
     "tests/shared",
+    "tests/styles",
     "tests/setup/node.ts",
     "tests/fixtures",
     "scripts/**/*.ts",

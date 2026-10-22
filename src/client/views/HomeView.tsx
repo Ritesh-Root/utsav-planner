@@ -69,7 +69,7 @@ export default function HomeView() {
               <a
                 className="btn btn-secondary"
                 href={hrefFor({ name: 'new', preset: preset.id })}
-                aria-label={`Start with the ${preset.label} sample`}
+                aria-label={`Start with this: ${preset.label} sample`}
               >
                 Start with this
               </a>

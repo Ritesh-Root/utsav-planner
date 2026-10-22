@@ -75,12 +75,15 @@ export default function IdeasPanel({ plan, update, refine }: PanelProps) {
               <h3 className="row-title">{idea.title}</h3>
               <p>{idea.description}</p>
               <div className="idea-foot">
-                <span className="unit">{COST_TIER_LABELS[idea.costTier]}</span>
+                <span className="unit">
+                  {COST_TIER_LABELS[idea.costTier]}
+                  {idea.saved && <span className="pill pill-accent saved-pill">Saved</span>}
+                </span>
                 <button
                   type="button"
                   className="btn btn-secondary btn-small"
                   aria-pressed={idea.saved}
-                  aria-label={`Save ${idea.title}`}
+                  aria-label={`Save: ${idea.title}`}
                   onClick={() => {
                     update(
                       {
@@ -95,7 +98,7 @@ export default function IdeasPanel({ plan, update, refine }: PanelProps) {
                     );
                   }}
                 >
-                  {idea.saved ? 'Saved' : 'Save'}
+                  Save
                 </button>
               </div>
             </li>

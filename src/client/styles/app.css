@@ -883,6 +883,9 @@ fieldset {
   grid-template-rows: auto auto 1fr auto;
   gap: 8px;
 }
+.saved-pill {
+  margin-left: 8px;
+}
 .idea-foot {
   display: flex;
   flex-wrap: wrap;
