@@ -4,7 +4,7 @@ import type { Plan } from './schemas.js';
 import { daysUntil, taskStatus } from './timeline.js';
 import { committedByKey, vendorState } from './vendors.js';
 
-export type InsightTone = 'alert' | 'warning' | 'info' | 'success';
+type InsightTone = 'alert' | 'warning' | 'info' | 'success';
 
 export interface Insight {
   id: string;

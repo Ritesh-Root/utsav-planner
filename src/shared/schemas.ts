@@ -23,7 +23,7 @@ export * from './constants.js';
 // the browser; jitless mode skips that probe there and keeps the JIT on Node.
 z.config({ jitless: 'document' in globalThis });
 
-export const IsoDateSchema = z
+const IsoDateSchema = z
   .string()
   .refine(isISODate, { message: 'Use a real date in YYYY-MM-DD format' });
 
@@ -87,6 +87,7 @@ const list = <T extends z.ZodType>(
   description: string,
 ) => z.array(item).min(min).meta({ minItems: target, maxItems: max, description });
 
+/** A budget line as the model returns it: a share, never an amount. */
 export const AiBudgetLineSchema = z.object({
   key: z.enum(BUDGET_KEYS),
   category: text('Short label shown to the user, e.g. "Catering & food"'),
@@ -97,6 +98,7 @@ export const AiBudgetLineSchema = z.object({
   estHigh: z.number().meta({ minimum: 0, description: 'Rough local cost estimate, high end' }),
 });
 
+/** A task as the model returns it: a lead time, never a date. */
 export const AiTaskSchema = z.object({
   title: text('Action, starting with a verb'),
   details: text('One practical sentence'),
@@ -108,6 +110,7 @@ export const AiTaskSchema = z.object({
   priority: z.enum(TASK_PRIORITIES),
 });
 
+/** A kind of vendor (never a business), why it matters and what to ask. */
 export const AiVendorSchema = z.object({
   category: text('Vendor type, never a business name'),
   budgetKey: z.enum(BUDGET_KEYS),
@@ -123,6 +126,7 @@ export const AiVendorSchema = z.object({
     .meta({ maxItems: LIMITS.questionsMax, description: 'Three questions to ask' }),
 });
 
+/** One personalised idea with a rough cost tier. */
 export const AiIdeaSchema = z.object({
   category: z.enum(IDEA_CATEGORIES),
   title: text('Short idea name'),
@@ -130,6 +134,7 @@ export const AiIdeaSchema = z.object({
   costTier: z.enum(COST_TIERS),
 });
 
+/** One run-sheet slot on a given day of the event. */
 export const AiDayOfSchema = z.object({
   day: z.number().int().meta({ minimum: 1, maximum: LIMITS.weddingDaysMax }),
   startMinute: z
@@ -139,6 +144,7 @@ export const AiDayOfSchema = z.object({
   title: text('What happens'),
 });
 
+/** Everything the model drafts for a new plan. */
 export const AiPlanSchema = z.object({
   title: text('Plan title'),
   summary: text('Two or three sentences summarising the approach'),
@@ -164,7 +170,7 @@ const optionalId = {
   id: z.string().optional().meta({ description: 'Existing id when updating an item' }),
 };
 
-export const AiRefineSectionsSchema = z.object({
+const AiRefineSectionsSchema = z.object({
   budget: z.array(AiBudgetLineSchema.extend(optionalId)).optional(),
   timeline: z.array(AiTaskSchema.extend(optionalId)).optional(),
   vendors: z.array(AiVendorSchema.extend(optionalId)).optional(),
@@ -172,6 +178,7 @@ export const AiRefineSectionsSchema = z.object({
   dayOf: z.array(AiDayOfSchema.extend(optionalId)).optional(),
 });
 
+/** The model’s answer to a follow-up: a message, changed sections and any brief changes. */
 export const AiRefineSchema = AiRefineSectionsSchema.extend({
   message: text('One or two sentences telling the user what changed'),
   briefPatch: z
@@ -200,7 +207,7 @@ const amount = z
   .max(LIMITS.budgetMax * 10);
 const storedText = (max: number) => z.string().max(max);
 
-export const BudgetLineSchema = z.strictObject({
+const BudgetLineSchema = z.strictObject({
   id,
   key: z.enum(BUDGET_KEYS),
   category: storedText(LIMITS.shortText),
@@ -214,7 +221,7 @@ export const BudgetLineSchema = z.strictObject({
   actual: amount,
 });
 
-export const TaskSchema = z.strictObject({
+const TaskSchema = z.strictObject({
   id,
   title: storedText(LIMITS.shortText),
   details: storedText(LIMITS.mediumText),
@@ -226,7 +233,7 @@ export const TaskSchema = z.strictObject({
   custom: z.boolean(),
 });
 
-export const VendorSchema = z.strictObject({
+const VendorSchema = z.strictObject({
   id,
   category: storedText(LIMITS.shortText),
   budgetKey: z.enum(BUDGET_KEYS),
@@ -241,7 +248,7 @@ export const VendorSchema = z.strictObject({
   notes: storedText(LIMITS.vendorNotesMax),
 });
 
-export const IdeaSchema = z.strictObject({
+const IdeaSchema = z.strictObject({
   id,
   category: z.enum(IDEA_CATEGORIES),
   title: storedText(LIMITS.shortText),
@@ -250,13 +257,14 @@ export const IdeaSchema = z.strictObject({
   saved: z.boolean(),
 });
 
-export const DayOfItemSchema = z.strictObject({
+const DayOfItemSchema = z.strictObject({
   id,
   day: z.number().int().min(1).max(LIMITS.weddingDaysMax),
   startMinute: z.number().int().min(0).max(LIMITS.dayMinutesMax),
   title: storedText(LIMITS.shortText),
 });
 
+/** A complete plan as stored in the browser and exchanged with the API. */
 export const PlanSchema = z.strictObject({
   version: z.literal(PLAN_VERSION),
   id,
@@ -287,6 +295,7 @@ export type DayOfItem = z.infer<typeof DayOfItemSchema>;
 // API contracts
 // ---------------------------------------------------------------------------
 
+/** Body of `POST /api/plan`. */
 export const PlanRequestSchema = z.strictObject({
   brief: BriefSchema,
   today: IsoDateSchema,
@@ -295,7 +304,7 @@ export const PlanRequestSchema = z.strictObject({
 const contextText = z.string().max(LIMITS.shortText);
 
 /** The minimum the model needs to refine a plan. Private fields never leave the browser. */
-export const RefineContextSchema = z.strictObject({
+const RefineContextSchema = z.strictObject({
   title: contextText,
   budget: z
     .array(
@@ -354,6 +363,7 @@ export const RefineContextSchema = z.strictObject({
 });
 export type RefineContext = z.infer<typeof RefineContextSchema>;
 
+/** Body of `POST /api/refine`. */
 export const RefineRequestSchema = z.strictObject({
   brief: BriefSchema,
   today: IsoDateSchema,
@@ -387,7 +397,7 @@ export interface ResponseMeta {
   model: string | null;
 }
 
-export const ResponseMetaSchema = z.object({
+const ResponseMetaSchema = z.object({
   source: z.enum(['ai', 'template']),
   fallbackReason: z.string().nullable(),
   cached: z.boolean(),

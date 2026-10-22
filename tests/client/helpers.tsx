@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import axe from 'axe-core';
 import type { ReactNode } from 'react';
+import { onTestFinished, vi } from 'vitest';
 
 import type { Plan } from '../../src/shared/schemas.js';
 import { AnnouncerProvider } from '../../src/client/state/announcer';
@@ -37,4 +38,29 @@ export function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+/** Stand-ins for URL.createObjectURL/revokeObjectURL (missing in jsdom), removed after the test. */
+export function stubObjectUrls() {
+  const create = vi.fn(() => 'blob:utsav');
+  const saved = (['createObjectURL', 'revokeObjectURL'] as const).map(
+    (key) => [key, Object.getOwnPropertyDescriptor(URL, key)] as const,
+  );
+  Object.defineProperty(URL, 'createObjectURL', {
+    value: create,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    value: vi.fn(),
+    configurable: true,
+    writable: true,
+  });
+  onTestFinished(() => {
+    for (const [key, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(URL, key, descriptor);
+      else Reflect.deleteProperty(URL, key);
+    }
+  });
+  return create;
 }

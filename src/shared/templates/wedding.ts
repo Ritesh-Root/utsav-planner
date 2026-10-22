@@ -136,6 +136,7 @@ function foodIdea(brief: Brief): AiPlan['ideas'][number] {
   };
 }
 
+/** Offline wedding plan, used when Gemini is unavailable. */
 export const weddingTemplate: EventTemplate = {
   budget: [
     share(

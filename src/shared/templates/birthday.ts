@@ -65,6 +65,7 @@ const ACTIVITY_IDEAS: Record<ReturnType<typeof ageGroup>, AiPlan['ideas'][number
   },
 };
 
+/** Offline birthday plan, used when Gemini is unavailable. */
 export const birthdayTemplate: EventTemplate = {
   budget: [
     share(

@@ -63,6 +63,61 @@ for (const [theme, width] of [
   await context.close();
 }
 
+function check(label, ok, detail = '') {
+  if (!ok) failures += 1;
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${label}${ok || !detail ? '' : `: ${detail}`}`);
+}
+
+// Behaviour in a real browser: exact budgets, and edits that survive a reload.
+{
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await page.goto(`${base}/#/new/birthday`, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Create my plan' }).click();
+  await page.waitForURL(/#\/plan\//, { timeout: 60_000 });
+  await page.waitForFunction(() => localStorage.getItem('utsav:v1:plans') !== null);
+  const budget = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('utsav:v1:plans') ?? '[]')[0]?.brief.budget,
+  );
+  await page.getByRole('tab', { name: 'Budget' }).click();
+  await page
+    .getByRole('textbox', { name: /^Planned for / })
+    .first()
+    .waitFor();
+  const planned = async () => {
+    const values = await page
+      .getByRole('textbox', { name: /^Planned for / })
+      .evaluateAll((inputs) => inputs.map((input) => Number(input.value.replace(/,/g, ''))));
+    return values.reduce((sum, value) => sum + value, 0);
+  };
+  check(
+    'budget lines add up to the budget',
+    (await planned()) === budget,
+    `${await planned()} vs ${budget}`,
+  );
+  const first = page.getByRole('textbox', { name: /^Planned for / }).first();
+  await first.fill('5000');
+  await first.press('Enter');
+  await page.getByText('Set by you').first().waitFor();
+  check(
+    'still adds up after locking a line',
+    (await planned()) === budget,
+    `${await planned()} vs ${budget}`,
+  );
+  await page.getByRole('tab', { name: 'Timeline' }).click();
+  const task = page.getByRole('checkbox').first();
+  const taskName = await task.evaluate((input) => input.labels?.[0]?.textContent ?? '');
+  await task.check();
+  await page.waitForTimeout(600);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('#plan-panel .panel');
+  check(
+    'a ticked task is still ticked after a reload',
+    await page.getByRole('checkbox', { name: taskName, exact: true }).first().isChecked(),
+  );
+  await context.close();
+}
+
 if (consoleErrors.length > 0) {
   failures += 1;
   console.log(`FAIL console errors:\n  ${consoleErrors.join('\n  ')}`);

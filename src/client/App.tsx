@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Shell } from './components/Shell';
 import { useDocumentTitle, usePageFocus } from './hooks';
 import { useRoute } from './router';
@@ -50,7 +51,9 @@ function Routes() {
   }
   return (
     <Shell route={route}>
-      <Suspense fallback={<p className="meta">Loading…</p>}>{view}</Suspense>
+      <ErrorBoundary key={route.name}>
+        <Suspense fallback={<p className="meta">Loading…</p>}>{view}</Suspense>
+      </ErrorBoundary>
     </Shell>
   );
 }

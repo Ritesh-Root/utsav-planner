@@ -1,4 +1,5 @@
-import { LIMITS } from '../../shared/limits.js';
+import { clampStartMinute } from '../../shared/dates.js';
+import { LIMITS, REFINE_MINIMUMS } from '../../shared/limits.js';
 import { estimateCap, toWholeAmount } from '../../shared/money.js';
 import { cleanText, dedupeKey, uniqueBy } from '../../shared/sanitize.js';
 import type {
@@ -14,13 +15,7 @@ import type {
   RefineScope,
 } from '../../shared/schemas.js';
 import { AiPlanSchema, AiRefineSchema, BriefPatchSchema } from '../../shared/schemas.js';
-import {
-  clampBookDays,
-  clampDay,
-  clampDaysBefore,
-  clampStartMinute,
-  eventDateIssue,
-} from '../../shared/timeline.js';
+import { clampBookDays, clampDay, clampDaysBefore, eventDateIssue } from '../../shared/timeline.js';
 
 /** The model answered, but not with something we can safely use. Retried once. */
 export class InvalidOutputError extends Error {
@@ -141,15 +136,12 @@ export function normalizePlanDraft(raw: unknown, brief: Brief): AiPlan {
   requireAtLeast(draft.timeline, LIMITS.tasksMin, 'tasks');
   requireAtLeast(draft.vendors, LIMITS.vendorsMin, 'vendors');
   requireAtLeast(draft.ideas, LIMITS.ideasMin, 'ideas');
-  requireAtLeast(draft.dayOf, 1, 'run sheet items');
+  requireAtLeast(draft.dayOf, LIMITS.dayOfMin, 'run sheet items');
   if (draft.budget.every((line) => line.sharePct <= 0)) {
     throw new InvalidOutputError('budget shares are all zero');
   }
   return draft;
 }
-
-/** Fewer items than this in a returned section would wipe out the plan. */
-const REFINE_MINIMUMS = { budget: 3, timeline: 3, vendors: 2, ideas: 3, dayOf: 1 } as const;
 
 function keepId<T extends { id?: string | undefined }>(item: T): T {
   if (item.id === undefined || (item.id.length > 0 && item.id.length <= LIMITS.idMax)) return item;

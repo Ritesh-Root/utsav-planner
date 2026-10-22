@@ -1,5 +1,6 @@
 import { LIMITS } from './limits.js';
 
+/** Currencies a plan can be budgeted in. */
 export const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'CAD', 'AUD'] as const;
 export type Currency = (typeof CURRENCIES)[number];
 

@@ -27,10 +27,12 @@ export function toDayNumber(iso: string): number | null {
   return ms / MS_PER_DAY;
 }
 
+/** True for a real calendar date written as `YYYY-MM-DD`. */
 export function isISODate(value: string): boolean {
   return toDayNumber(value) !== null;
 }
 
+/** The `YYYY-MM-DD` date for a count of days since 1970-01-01. */
 export function fromDayNumber(dayNumber: number): string {
   return new Date(dayNumber * MS_PER_DAY).toISOString().slice(0, 10);
 }
@@ -41,6 +43,7 @@ function mustParse(iso: string): number {
   return dayNumber;
 }
 
+/** The date `days` after `iso` (before it when negative). */
 export function addDays(iso: string, days: number): string {
   return fromDayNumber(mustParse(iso) + days);
 }
@@ -50,6 +53,7 @@ export function diffDays(from: string, to: string): number {
   return mustParse(to) - mustParse(from);
 }
 
+/** The later of two dates. */
 export function maxDate(a: string, b: string): string {
   return diffDays(a, b) > 0 ? b : a;
 }
@@ -62,6 +66,7 @@ export function localToday(now: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Today in UTC, which the server checks client dates against. */
 export function utcToday(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
@@ -90,9 +95,14 @@ export function formatDate(iso: string, locale = 'en-IN'): string {
   return formatter.format(new Date(mustParse(iso) * MS_PER_DAY));
 }
 
+/** A run-sheet start time as whole minutes after midnight, within one day. */
+export function clampStartMinute(minutes: number): number {
+  return Math.min(Math.max(Math.round(minutes), 0), LIMITS.dayMinutesMax);
+}
+
 /** "18:30" from minutes after midnight. */
 export function formatMinutes(minutes: number): string {
-  const clamped = Math.min(Math.max(Math.round(minutes), 0), LIMITS.dayMinutesMax);
+  const clamped = clampStartMinute(minutes);
   const hours = String(Math.floor(clamped / 60)).padStart(2, '0');
   const mins = String(clamped % 60).padStart(2, '0');
   return `${hours}:${mins}`;

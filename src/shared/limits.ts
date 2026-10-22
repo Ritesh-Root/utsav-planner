@@ -31,6 +31,7 @@ export const LIMITS = {
   ideasMin: 5,
   ideasMax: 10,
   dayOfMax: 14,
+  dayOfMin: 1,
   assumptionsMax: 5,
 
   /** Lead times the AI may use, in days before the event (negative = after it). */
@@ -60,8 +61,14 @@ export const LIMITS = {
   fieldErrorsMax: 20,
 
   importBytesMax: 256 * 1024,
+  /** Plans in one backup file. */
+  importPlansMax: 50,
   requestBytesMax: 32 * 1024,
   undoDepth: 20,
 } as const;
 
+/** Budget shares are stored in basis points: 10,000 is the whole budget. */
 export const BASIS_POINTS = 10_000;
+
+/** Fewer items than this in a refined section would wipe out that part of the plan. */
+export const REFINE_MINIMUMS = { budget: 3, timeline: 3, vendors: 2, ideas: 3, dayOf: 1 } as const;

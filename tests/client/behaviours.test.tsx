@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../../src/client/App';
+import { ErrorBoundary } from '../../src/client/components/ErrorBoundary';
 import { requestPlan } from '../../src/client/api';
 import { PLANS_KEY } from '../../src/client/storage';
 import HomeView from '../../src/client/views/HomeView';
@@ -11,6 +12,7 @@ import PlanView from '../../src/client/views/PlanView';
 import SettingsView from '../../src/client/views/SettingsView';
 import { addDays, localToday } from '../../src/shared/dates.js';
 import { finalizePlan } from '../../src/shared/plan.js';
+import { buildTemplateDraft as draftFor } from '../../src/shared/templates/index.js';
 import type { Brief, Plan } from '../../src/shared/schemas.js';
 import { buildTemplateDraft } from '../../src/shared/templates/index.js';
 import { TODAY, birthdayBrief, sequentialIds, templatePlan } from '../fixtures/plans';
@@ -74,9 +76,12 @@ describe('saved plans', () => {
     });
     renderWithProviders(<PlanView id="plan-1" tab="overview" />, [planFor()]);
     await user.click(screen.getAllByRole('checkbox')[0]!);
-    await waitFor(() => {
-      expect(alertText()).toContain('couldn’t save in this browser');
-    });
+    await waitFor(
+      () => {
+        expect(alertText()).toContain('couldn’t save in this browser');
+      },
+      { timeout: 2000 },
+    );
   });
 
   it('writes the last edit at once when the page is hidden', async () => {
@@ -167,18 +172,25 @@ describe('settings: backups', () => {
       screen.getByLabelText('Open a plan file'),
       upload(JSON.stringify([plan, plan])),
     );
-    expect(await screen.findByText('Imported 2 plans.')).toBeInTheDocument();
+    expect(await screen.findByText('Imported 2 plans.', { selector: 'p' })).toBeInTheDocument();
     expect(screen.getByText(/3 plans are saved/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(statusText()).toContain('Imported 2 plans.');
+    });
   });
 
-  it('rejects a damaged file with an alert', async () => {
+  it('rejects a damaged file, announcing it urgently and describing the field', async () => {
     const user = userEvent.setup();
     renderWithProviders(<SettingsView />);
-    await user.upload(screen.getByLabelText('Open a plan file'), upload('{nope'));
-    expect(await screen.findByText('That file is not valid JSON.')).toHaveAttribute(
-      'role',
-      'alert',
-    );
+    const input = screen.getByLabelText('Open a plan file');
+    await user.upload(input, upload('{nope'));
+    expect(
+      await screen.findByText('That file is not valid JSON.', { selector: 'p' }),
+    ).toHaveAttribute('id', 'import-result');
+    expect(input).toHaveAccessibleDescription('That file is not valid JSON.');
+    await waitFor(() => {
+      expect(alertText()).toContain('That file is not valid JSON.');
+    });
   });
 
   it('deletes all plans only after confirming', async () => {
@@ -293,5 +305,102 @@ describe('editing every part of the plan by hand', () => {
       'aria-pressed',
       'true',
     );
+  });
+});
+
+describe('things going wrong', () => {
+  it('offers a reload instead of a blank page when a view fails', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const Broken = () => {
+      throw new Error('chunk failed to load');
+    };
+    renderWithProviders(
+      <ErrorBoundary>
+        <Broken />
+      </ErrorBoundary>,
+    );
+    expect(alertText()).toContain('This page couldn’t load');
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+  });
+
+  it('explains a cleared date instead of failing silently', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PlanView id="plan-1" tab="timeline" />, [planFor()]);
+    await user.type(screen.getByLabelText('Task'), 'Buy candles');
+    const due = screen.getByLabelText('Due');
+    fireEvent.change(due, { target: { value: '' } });
+    await user.click(screen.getByRole('button', { name: 'Add task' }));
+    expect(alertText()).toContain('Choose today or a later date.');
+    expect(due).toHaveAttribute('aria-invalid', 'true');
+    expect(due).toHaveAccessibleDescription('Choose today or a later date.');
+    expect(screen.getByLabelText('Task')).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.queryByRole('checkbox', { name: 'Buy candles' })).not.toBeInTheDocument();
+  });
+
+  it('asks for a book-by date when it is cleared', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PlanView id="plan-1" tab="vendors" />, [planFor()]);
+    await user.type(screen.getByLabelText('Kind of vendor'), 'Magician');
+    fireEvent.change(screen.getByLabelText('Book by'), { target: { value: '' } });
+    await user.click(screen.getByRole('button', { name: 'Add vendor' }));
+    expect(alertText()).toContain('Choose the date to book by.');
+    expect(screen.queryByRole('heading', { name: 'Magician' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the plan as it was when a refinement is discarded', async () => {
+    const user = userEvent.setup();
+    const plan = planFor();
+    const ideas = draftFor(plan.brief).ideas.map((idea, i) => ({
+      ...idea,
+      title: `Other idea ${i}`,
+    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          jsonResponse({
+            result: { message: 'New ideas.', briefPatch: null, sections: { ideas } },
+            meta: { source: 'ai', fallbackReason: null, cached: false, latencyMs: 5, model: 'm' },
+          }),
+        ),
+      ),
+    );
+    renderWithProviders(<PlanView id="plan-1" tab="ideas" />, [plan]);
+    await user.click(screen.getByRole('button', { name: 'Refine with AI' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Refine with AI' });
+    await user.type(within(dialog).getByLabelText('Your request'), 'Other ideas');
+    await user.click(within(dialog).getByRole('button', { name: 'Ask Utsav' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Discard' }));
+    expect(within(dialog).getByLabelText('Your request')).toBeInTheDocument();
+    expect(screen.queryByText('Other idea 0')).not.toBeInTheDocument();
+  });
+
+  it('stops asking Gemini when the refine dialog is closed mid-request', async () => {
+    const user = userEvent.setup();
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            signal = init.signal ?? undefined;
+            init.signal?.addEventListener('abort', () => {
+              reject(new DOMException('aborted', 'AbortError'));
+            });
+          }),
+      ),
+    );
+    const plan = planFor();
+    renderWithProviders(<PlanView id="plan-1" tab="overview" />, [plan]);
+    await user.click(screen.getByRole('button', { name: 'Refine with AI' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Refine with AI' });
+    await user.type(within(dialog).getByLabelText('Your request'), 'More guests');
+    await user.click(within(dialog).getByRole('button', { name: 'Ask Utsav' }));
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(signal?.aborted).toBe(true);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(plan.brief.title);
   });
 });

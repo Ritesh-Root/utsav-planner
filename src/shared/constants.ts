@@ -3,8 +3,11 @@
  * without loading the validation library.
  */
 
+/** Kinds of event Utsav plans. */
 export const EVENT_TYPES = ['wedding', 'birthday', 'community'] as const;
+/** Where the event can happen. */
 export const VENUE_PREFERENCES = ['indoor', 'outdoor', 'either'] as const;
+/** What matters most to the host; up to three are chosen. */
 export const PRIORITIES = [
   'food',
   'decor',
@@ -15,7 +18,9 @@ export const PRIORITIES = [
   'sustainability',
   'traditions',
 ] as const;
+/** Dietary needs the food ideas and caterer questions respect. */
 export const DIETARY = ['vegetarian', 'vegan', 'jain', 'halal', 'gluten-free', 'nut-free'] as const;
+/** Budget categories; the label shown is the plan’s own wording. */
 export const BUDGET_KEYS = [
   'venue',
   'catering',
@@ -40,7 +45,9 @@ export const BUDGET_KEYS = [
   'misc',
   'contingency',
 ] as const;
+/** How urgent a task is. */
 export const TASK_PRIORITIES = ['high', 'medium', 'low'] as const;
+/** Where each vendor is on the way to being booked. */
 export const VENDOR_STATUSES = [
   'not-started',
   'researching',
@@ -49,6 +56,7 @@ export const VENDOR_STATUSES = [
   'booked',
   'not-needed',
 ] as const;
+/** Kinds of idea, used for filters. */
 export const IDEA_CATEGORIES = [
   'theme',
   'decor',
@@ -59,7 +67,9 @@ export const IDEA_CATEGORIES = [
   'sustainability',
   'keepsake',
 ] as const;
+/** Rough cost of an idea. */
 export const COST_TIERS = ['low', 'medium', 'high'] as const;
+/** Which part of the plan a refinement may change. */
 export const REFINE_SCOPES = ['all', 'budget', 'timeline', 'vendors', 'ideas', 'dayOf'] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

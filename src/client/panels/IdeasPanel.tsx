@@ -1,10 +1,11 @@
-import type { SubmitEvent } from 'react';
-import { useId, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { IDEA_CATEGORIES } from '../../shared/constants.js';
 import { LIMITS } from '../../shared/limits.js';
 import { addCustomIdea, randomId, toggleIdeaSaved } from '../../shared/plan.js';
 import type { IdeaCategory } from '../../shared/schemas.js';
+import type { FormError } from '../components/InlineForm';
+import { FormField, InlineForm } from '../components/InlineForm';
 import { COST_TIER_LABELS, IDEA_CATEGORY_LABELS, pluralize } from '../labels';
 import type { PanelProps } from './types';
 
@@ -14,16 +15,14 @@ function AddIdeaForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<IdeaCategory>('theme');
-  const [error, setError] = useState('');
-  const id = useId();
+  const [error, setError] = useState<FormError | null>(null);
 
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault();
+  const submit = () => {
     if (title.trim() === '') {
-      setError('Give your idea a short name.');
+      setError({ message: 'Give your idea a short name.', fields: ['name'] });
       return;
     }
-    setError('');
+    setError(null);
     update(addCustomIdea(plan, { title, description, category }, randomId, new Date()), {
       undoable: true,
       announcement: `Saved your idea ${title.trim()}`,
@@ -33,71 +32,54 @@ function AddIdeaForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   };
 
   return (
-    <form className="inner form" onSubmit={submit} noValidate aria-labelledby={`${id}-title`}>
-      <h3 id={`${id}-title`} className="panel-title">
-        Add your own idea
-      </h3>
-      {error && (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      )}
+    <InlineForm heading="Add your own idea" error={error} submitLabel="Save idea" onSubmit={submit}>
       <div className="field-row">
-        <div className="field">
-          <label className="label" htmlFor={`${id}-name`}>
-            Idea
-          </label>
-          <input
-            id={`${id}-name`}
-            className="input"
-            maxLength={LIMITS.shortText}
-            value={title}
-            aria-invalid={error !== ''}
+        <FormField name="name" label="Idea">
+          {(control) => (
+            <input
+              {...control}
+              className="input"
+              maxLength={LIMITS.shortText}
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+              }}
+            />
+          )}
+        </FormField>
+        <FormField name="category" label="Kind">
+          {(control) => (
+            <select
+              {...control}
+              className="select"
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value as IdeaCategory);
+              }}
+            >
+              {IDEA_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {IDEA_CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
+      </div>
+      <FormField name="details" label="Details (optional)">
+        {(control) => (
+          <textarea
+            {...control}
+            className="textarea"
+            maxLength={LIMITS.longText}
+            value={description}
             onChange={(e) => {
-              setTitle(e.target.value);
+              setDescription(e.target.value);
             }}
           />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor={`${id}-category`}>
-            Kind
-          </label>
-          <select
-            id={`${id}-category`}
-            className="select"
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value as IdeaCategory);
-            }}
-          >
-            {IDEA_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {IDEA_CATEGORY_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <div className="field">
-        <label className="label" htmlFor={`${id}-details`}>
-          Details (optional)
-        </label>
-        <textarea
-          id={`${id}-details`}
-          className="textarea"
-          maxLength={LIMITS.longText}
-          value={description}
-          onChange={(e) => {
-            setDescription(e.target.value);
-          }}
-        />
-      </div>
-      <div>
-        <button type="submit" className="btn btn-secondary btn-small">
-          Save idea
-        </button>
-      </div>
-    </form>
+        )}
+      </FormField>
+    </InlineForm>
   );
 }
 

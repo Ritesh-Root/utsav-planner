@@ -47,6 +47,7 @@ const RETRYABLE: ReadonlySet<AiErrorKind> = new Set([
   'invalid',
 ]);
 
+/** A failed model call, sorted into a kind the planner can act on (retry, fall back, or report). */
 export class AiError extends Error {
   readonly retryable: boolean;
 

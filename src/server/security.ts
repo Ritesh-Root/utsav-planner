@@ -33,6 +33,7 @@ export const securityHeaders: RequestHandler = helmet({
   frameguard: { action: 'deny' },
 });
 
+/** Turns off browser features the app never uses (camera, microphone, location and more). */
 export const permissionsPolicy: RequestHandler = (_req, res, next) => {
   res.setHeader(
     'Permissions-Policy',
@@ -41,6 +42,7 @@ export const permissionsPolicy: RequestHandler = (_req, res, next) => {
   next();
 };
 
+/** Tags each response with an `X-Request-Id` that also appears in the logs. */
 export const requestId: RequestHandler = (_req, res, next) => {
   const id = randomUUID();
   res.locals.requestId = id;
@@ -48,6 +50,7 @@ export const requestId: RequestHandler = (_req, res, next) => {
   next();
 };
 
+/** API answers are personal to the request, so they are never cached. */
 export const noStore: RequestHandler = (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   next();
@@ -80,6 +83,7 @@ export const sameOriginWrites: RequestHandler = (req, _res, next) => {
   next();
 };
 
+/** Writes must be JSON (415 otherwise). */
 export const requireJson: RequestHandler = (req, _res, next) => {
   if (req.method === 'POST' && !req.is('application/json')) {
     next(

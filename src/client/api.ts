@@ -51,7 +51,11 @@ async function postJson<S extends z.ZodType>(
     });
   } catch (error) {
     if (signal?.aborted) throw error;
-    throw new ApiError(0, timeout.aborted ? 'TIMEOUT' : 'NETWORK', 'Couldn’t reach Utsav.');
+    throw new ApiError(
+      0,
+      timeout.aborted ? 'TIMEOUT' : 'NETWORK',
+      'Couldn’t reach Utsav. Check your connection and try again.',
+    );
   }
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {

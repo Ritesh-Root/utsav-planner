@@ -2,7 +2,7 @@
  * Structured JSON logs that Cloud Logging understands. Callers pass counts,
  * hashes and timings only — never the user's text.
  */
-export type LogFields = Record<string, string | number | boolean | null | undefined>;
+type LogFields = Record<string, string | number | boolean | null | undefined>;
 
 export interface Logger {
   info(message: string, fields?: LogFields): void;

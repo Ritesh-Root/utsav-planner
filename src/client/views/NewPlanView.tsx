@@ -42,8 +42,10 @@ export default function NewPlanView({ preset }: { preset: EventType | null }) {
     setWorking(brief);
     announce(`Planning ${brief.title}. This usually takes about ten seconds.`);
     controller.current = new AbortController();
-    // Fetch the workspace's code while Gemini works, so the plan opens at once.
-    void import('./PlanView');
+    // Fetch the workspace's code while Gemini works, so the plan opens at once, and
+    // the offline planner while the network is still up, in case the request fails.
+    void import('./PlanView').catch(() => undefined);
+    const offline = import('../offline').catch(() => null);
     try {
       const { plan } = await requestPlan(brief, today, controller.current.signal);
       savePlan(plan);
@@ -57,10 +59,10 @@ export default function NewPlanView({ preset }: { preset: EventType | null }) {
         announce('Planning cancelled.');
         return;
       }
-      if (error instanceof ApiError && error.unreachable) {
+      const offlinePlanner = await offline;
+      if (error instanceof ApiError && error.unreachable && offlinePlanner) {
         // The service is down or we are offline: build a template plan on the device instead.
-        const { buildOfflinePlan } = await import('../offline');
-        const plan = buildOfflinePlan(brief, today);
+        const plan = offlinePlanner.buildOfflinePlan(brief, today);
         savePlan(plan);
         announce(
           'Utsav could not be reached, so your plan was built on this device from templates.',
@@ -105,6 +107,7 @@ export default function NewPlanView({ preset }: { preset: EventType | null }) {
                   className="btn btn-secondary"
                   onClick={() => {
                     controller.current?.abort();
+                    setWorking(null);
                   }}
                 >
                   Cancel

@@ -32,6 +32,9 @@ if (typeof window.matchMedia !== 'function') {
 // vi.unstubAllGlobals(), which would otherwise restore the real fetch.
 beforeEach(() => {
   vi.stubGlobal('fetch', () => Promise.reject(new Error('Network access is disabled in tests')));
+  // A fixed calendar, so dates in assertions never flip at midnight. Timers stay real.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-22T06:30:00.000Z'));
 });
 
 // axe-core probes <canvas>; jsdom has none, so answer null instead of logging noise.
@@ -40,4 +43,5 @@ HTMLCanvasElement.prototype.getContext = () => null;
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.useRealTimers();
 });

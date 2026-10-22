@@ -50,11 +50,6 @@ export function clampDay(day: number, days: number): number {
   return Math.min(Math.max(Math.round(day), 1), days);
 }
 
-/** Minutes after midnight, kept within one day. */
-export function clampStartMinute(minutes: number): number {
-  return Math.min(Math.max(Math.round(minutes), 0), LIMITS.dayMinutesMax);
-}
-
 /**
  * When a task (or a booking) should happen. If its ideal date has already gone
  * by the time the plan is made, it is due on `referenceDay` and flagged

@@ -32,6 +32,7 @@ export function validationError(error: ZodError, message = 'Some details need fi
   });
 }
 
+/** Unknown API routes become a 404 in the standard error envelope. */
 export const notFound: RequestHandler = (_req, _res, next) => {
   next(new HttpError(404, 'NOT_FOUND', 'No such endpoint.'));
 };

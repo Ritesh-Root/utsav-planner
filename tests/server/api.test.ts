@@ -173,6 +173,22 @@ describe('request hygiene', () => {
     await send('1.1.1.1, 203.0.113.9').expect(200);
     await send('2.2.2.2, 203.0.113.9').expect(200);
     await send('3.3.3.3, 203.0.113.9').expect(429);
+    // A different address seen by the proxy gets its own allowance.
+    await send('3.3.3.3, 203.0.113.10').expect(200);
+  });
+
+  it('accepts a device a day behind UTC and refuses events beyond the horizon', async () => {
+    await request(appWith())
+      .post('/api/plan')
+      .send({ ...planBody, today: '2026-10-21' })
+      .expect(200);
+    const far = await request(appWith())
+      .post('/api/plan')
+      .send({ brief: { ...birthdayBrief, date: '2030-01-01' }, today: TODAY })
+      .expect(400);
+    expect(far.body.error.fields).toEqual([
+      { path: 'brief.date', message: 'Pick a date within three years' },
+    ]);
   });
 
   it('returns JSON 404s for unknown API routes', async () => {

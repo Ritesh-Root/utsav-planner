@@ -1,8 +1,7 @@
-import type { SubmitEvent } from 'react';
 import { useId, useState } from 'react';
 
 import { VENDOR_STATUSES } from '../../shared/constants.js';
-import { addDays, formatDate } from '../../shared/dates.js';
+import { addDays, formatDate, isISODate } from '../../shared/dates.js';
 import { LIMITS } from '../../shared/limits.js';
 import { googleMapsSearchUrl } from '../../shared/links.js';
 import type { VendorChanges } from '../../shared/plan.js';
@@ -10,6 +9,8 @@ import { addCustomVendor, randomId, removeVendor, updateVendor } from '../../sha
 import type { Vendor, VendorStatus } from '../../shared/schemas.js';
 import { vendorProgress, vendorState } from '../../shared/vendors.js';
 import { AmountInput, Pill, Track } from '../components/Display';
+import type { FormError } from '../components/InlineForm';
+import { FormField, InlineForm } from '../components/InlineForm';
 import { VENDOR_STATUS_LABELS } from '../labels';
 import type { PanelProps } from './types';
 
@@ -158,16 +159,21 @@ function AddVendorForm({ plan, today, update }: Pick<PanelProps, 'plan' | 'today
     const twoWeeks = addDays(today, 14);
     return twoWeeks < plan.brief.date ? twoWeeks : today;
   });
-  const [error, setError] = useState('');
-  const id = useId();
+  const [error, setError] = useState<FormError | null>(null);
 
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault();
+  const submit = () => {
     if (category.trim() === '') {
-      setError('Say which kind of vendor, for example "Live band".');
+      setError({
+        message: 'Say which kind of vendor, for example "Live band".',
+        fields: ['category'],
+      });
       return;
     }
-    setError('');
+    if (!isISODate(bookBy)) {
+      setError({ message: 'Choose the date to book by.', fields: ['book-by'] });
+      return;
+    }
+    setError(null);
     update(
       addCustomVendor(plan, { category, budgetKey: 'misc', bookBy }, randomId, today, new Date()),
       { undoable: true, announcement: `Added ${category.trim()}` },
@@ -176,54 +182,43 @@ function AddVendorForm({ plan, today, update }: Pick<PanelProps, 'plan' | 'today
   };
 
   return (
-    <form className="inner form" onSubmit={submit} noValidate aria-labelledby={`${id}-title`}>
-      <h3 id={`${id}-title`} className="panel-title">
-        Add a vendor you need
-      </h3>
-      {error && (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      )}
+    <InlineForm
+      heading="Add a vendor you need"
+      error={error}
+      submitLabel="Add vendor"
+      onSubmit={submit}
+    >
       <div className="field-row">
-        <div className="field">
-          <label className="label" htmlFor={`${id}-category`}>
-            Kind of vendor
-          </label>
-          <input
-            id={`${id}-category`}
-            className="input"
-            maxLength={LIMITS.shortText}
-            value={category}
-            aria-invalid={error !== ''}
-            onChange={(e) => {
-              setCategory(e.target.value);
-            }}
-          />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor={`${id}-book-by`}>
-            Book by
-          </label>
-          <input
-            id={`${id}-book-by`}
-            className="input"
-            type="date"
-            min={today}
-            max={plan.brief.date}
-            value={bookBy}
-            onChange={(e) => {
-              setBookBy(e.target.value);
-            }}
-          />
-        </div>
+        <FormField name="category" label="Kind of vendor">
+          {(control) => (
+            <input
+              {...control}
+              className="input"
+              maxLength={LIMITS.shortText}
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value);
+              }}
+            />
+          )}
+        </FormField>
+        <FormField name="book-by" label="Book by">
+          {(control) => (
+            <input
+              {...control}
+              className="input"
+              type="date"
+              min={today}
+              max={plan.brief.date}
+              value={bookBy}
+              onChange={(e) => {
+                setBookBy(e.target.value);
+              }}
+            />
+          )}
+        </FormField>
       </div>
-      <div>
-        <button type="submit" className="btn btn-secondary btn-small">
-          Add vendor
-        </button>
-      </div>
-    </form>
+    </InlineForm>
   );
 }
 

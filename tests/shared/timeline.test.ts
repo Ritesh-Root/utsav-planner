@@ -1,10 +1,10 @@
+import { clampStartMinute } from '../../src/shared/dates.js';
 import { describe, expect, it } from 'vitest';
 
 import {
   clampBookDays,
   clampDay,
   clampDaysBefore,
-  clampStartMinute,
   daysUntil,
   eventDateIssue,
   groupByPhase,

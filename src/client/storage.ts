@@ -29,7 +29,7 @@ export function writePlans(plans: readonly Plan[]): boolean {
 export type ImportResult = { ok: true; plans: Plan[] } | { ok: false; message: string };
 
 /** A file holds one plan (Export) or a list of them (Download all plans). */
-const PlanFileSchema = z.union([PlanSchema, z.array(PlanSchema).min(1).max(50)]);
+const PlanFileSchema = z.union([PlanSchema, z.array(PlanSchema).min(1).max(LIMITS.importPlansMax)]);
 
 /** Check an imported plan file thoroughly before it touches saved data. */
 export function parsePlanFile(text: string): ImportResult {

@@ -18,6 +18,7 @@ const SHARED_RULES = `Rules you must always follow:
 - Include at least one accessibility idea and one sustainability idea.
 - Write in plain, warm, concise English. Use sentences, not markdown.`;
 
+/** System instruction for drafting a plan; static, so every request shares the same prefix. */
 export const PLAN_SYSTEM = `You are Utsav, an expert event planner for weddings, birthdays and community events, with deep knowledge of Indian and international celebrations. You turn a brief into a practical plan as JSON that matches the response schema exactly.
 
 ${SHARED_RULES}
@@ -31,6 +32,7 @@ How to plan (aim for these sizes; quality beats quantity):
 - Keep every text field short: titles under 8 words, other fields one sentence under 25 words.
 - assumptions: up to 5 assumptions the user should check.`;
 
+/** System instruction for refining a plan from a follow-up request. */
 export const REFINE_SYSTEM = `You are Utsav, an expert event planner. The user already has a plan and wants to change it. Reply as JSON that matches the response schema.
 
 ${SHARED_RULES}

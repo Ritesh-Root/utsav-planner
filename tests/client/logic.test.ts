@@ -17,6 +17,10 @@ import { PlanSchema } from '../../src/shared/schemas.js';
 import { NOW, TODAY, birthdayBrief, templatePlan } from '../fixtures/plans';
 import { jsonResponse } from './helpers';
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('router', () => {
   it('parses every route and round-trips through hrefFor', () => {
     const cases = [
@@ -105,6 +109,14 @@ describe('storage and settings', () => {
     expect(readPlans()).toEqual([]);
     expect(writePlans([newer])).toBe(true);
     expect(readPlans()).toHaveLength(1);
+  });
+
+  it('copes when the browser blocks storage altogether', () => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    expect(readPlans()).toEqual([]);
+    expect(writePlans([])).toBe(false);
   });
 
   it('checks imported plan files before trusting them', () => {
@@ -228,6 +240,20 @@ describe('api client', () => {
       vi.fn(() => Promise.resolve(new Response('busy', { status: 503 }))),
     );
     await expect(requestPlan(birthdayBrief, TODAY)).rejects.toMatchObject({ unreachable: true });
+  });
+
+  it('reports a timeout when the request takes too long', async () => {
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(
+      AbortSignal.abort(new DOMException('slow', 'TimeoutError')),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new DOMException('slow', 'TimeoutError'))),
+    );
+    await expect(requestPlan(birthdayBrief, TODAY)).rejects.toMatchObject({
+      code: 'TIMEOUT',
+      unreachable: true,
+    });
   });
 
   it('builds a labelled plan on the device when offline', () => {

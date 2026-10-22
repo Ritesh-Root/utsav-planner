@@ -1,4 +1,3 @@
-import type { SubmitEvent } from 'react';
 import { useId, useMemo, useState } from 'react';
 
 import { projectGuests, summarizeBudget } from '../../shared/budget.js';
@@ -16,6 +15,8 @@ import {
 } from '../../shared/plan.js';
 import { committedByKey } from '../../shared/vendors.js';
 import { AmountInput, Money, Pill, Track } from '../components/Display';
+import type { FormError } from '../components/InlineForm';
+import { FormField, InlineForm } from '../components/InlineForm';
 import type { PanelProps } from './types';
 
 /** A formatter for one currency, shared by everything on this tab. */
@@ -103,17 +104,19 @@ function GuestWhatIf({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
 function AddLineForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
-  const [error, setError] = useState('');
-  const id = useId();
+  const [error, setError] = useState<FormError | null>(null);
 
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault();
+  const submit = () => {
     const value = parseWholeNumber(amount);
-    if (category.trim() === '' || value === null || value > LIMITS.budgetMax) {
-      setError('Name the line and give a whole-number amount.');
+    const badAmount = value === null || value > LIMITS.budgetMax;
+    if (category.trim() === '' || badAmount) {
+      setError({
+        message: 'Name the line and give a whole-number amount.',
+        fields: [...(category.trim() === '' ? ['category'] : []), ...(badAmount ? ['amount'] : [])],
+      });
       return;
     }
-    setError('');
+    setError(null);
     update(addBudgetLine(plan, { category, amount: value }, randomId, new Date()), {
       undoable: true,
       announcement: `Added ${category.trim()}; other lines rebalanced`,
@@ -123,51 +126,36 @@ function AddLineForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   };
 
   return (
-    <form className="inner form" onSubmit={submit} noValidate aria-labelledby={`${id}-title`}>
-      <h3 id={`${id}-title`} className="panel-title">
-        Add a budget line
-      </h3>
-      {error && (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      )}
+    <InlineForm heading="Add a budget line" error={error} submitLabel="Add line" onSubmit={submit}>
       <div className="field-row">
-        <div className="field">
-          <label className="label" htmlFor={`${id}-category`}>
-            What it is for
-          </label>
-          <input
-            id={`${id}-category`}
-            className="input"
-            maxLength={LIMITS.shortText}
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-            }}
-          />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor={`${id}-amount`}>
-            Amount ({plan.brief.currency})
-          </label>
-          <input
-            id={`${id}-amount`}
-            className="input"
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-            }}
-          />
-        </div>
+        <FormField name="category" label="What it is for">
+          {(control) => (
+            <input
+              {...control}
+              className="input"
+              maxLength={LIMITS.shortText}
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value);
+              }}
+            />
+          )}
+        </FormField>
+        <FormField name="amount" label={`Amount (${plan.brief.currency})`}>
+          {(control) => (
+            <input
+              {...control}
+              className="input"
+              inputMode="numeric"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+              }}
+            />
+          )}
+        </FormField>
       </div>
-      <div>
-        <button type="submit" className="btn btn-secondary btn-small">
-          Add line
-        </button>
-      </div>
-    </form>
+    </InlineForm>
   );
 }
 

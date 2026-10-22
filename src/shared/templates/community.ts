@@ -1,6 +1,7 @@
 import type { EventTemplate } from './types.js';
 import { at, share } from './types.js';
 
+/** Offline community-event plan, used when Gemini is unavailable. */
 export const communityTemplate: EventTemplate = {
   budget: [
     share(

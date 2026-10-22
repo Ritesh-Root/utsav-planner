@@ -29,7 +29,7 @@ import {
 } from './prompts.js';
 import { PLAN_RESPONSE_SCHEMA, refineResponseSchema } from './schema.js';
 
-export const AI_LIMITS = {
+const AI_LIMITS = {
   planTimeoutMs: 25_000,
   refineTimeoutMs: 20_000,
   totalBudgetMs: 40_000,
@@ -81,12 +81,12 @@ function failureKind(error: unknown): FallbackKind {
   return 'error';
 }
 
-export interface PlanOutcome {
+interface PlanOutcome {
   plan: Plan;
   meta: ResponseMeta;
 }
 
-export interface RefineOutcome {
+interface RefineOutcome {
   result: RefineResult;
   meta: ResponseMeta;
 }

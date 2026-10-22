@@ -8,7 +8,7 @@ import { finalizePlan } from '../../src/shared/plan.js';
 import type { Brief, Plan } from '../../src/shared/schemas.js';
 import { buildTemplateDraft } from '../../src/shared/templates/index.js';
 import { birthdayBrief, communityBrief, sequentialIds } from '../fixtures/plans';
-import { axeViolations, jsonResponse, renderWithProviders } from './helpers';
+import { axeViolations, jsonResponse, renderWithProviders, stubObjectUrls } from './helpers';
 
 function planFor(brief: Brief, daysAway: number, source: 'ai' | 'template' = 'ai'): Plan {
   const today = localToday();
@@ -58,11 +58,7 @@ describe('timeline tab', () => {
 
   it('downloads the calendar file', async () => {
     const user = userEvent.setup();
-    const createUrl = vi.fn(() => 'blob:calendar');
-    vi.stubGlobal(
-      'URL',
-      Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() }),
-    );
+    const createUrl = stubObjectUrls();
     const click = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => undefined);

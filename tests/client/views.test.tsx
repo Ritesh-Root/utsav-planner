@@ -147,6 +147,10 @@ describe('plan workspace', () => {
     expect(window.location.hash).toBe('#/plan/plan-1/budget');
     await user.keyboard('{End}');
     expect(window.location.hash).toBe('#/plan/plan-1/ideas');
+    await user.keyboard('{Home}');
+    expect(window.location.hash).toBe('#/plan/plan-1');
+    await user.keyboard('{ArrowLeft}');
+    expect(window.location.hash).toBe('#/plan/plan-1/ideas');
   });
 
   it('ticks off a task and offers Undo', async () => {

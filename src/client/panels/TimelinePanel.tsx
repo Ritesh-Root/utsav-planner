@@ -1,8 +1,7 @@
-import type { SubmitEvent } from 'react';
-import { useId, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { TASK_PRIORITIES } from '../../shared/constants.js';
-import { diffDays, formatMinutes } from '../../shared/dates.js';
+import { diffDays, formatMinutes, isISODate } from '../../shared/dates.js';
 import { LIMITS } from '../../shared/limits.js';
 import { googleCalendarUrl } from '../../shared/links.js';
 import { addCustomTask, addDayOfItem, randomId, removeDayOfItem } from '../../shared/plan.js';
@@ -10,6 +9,8 @@ import type { DayOfItem, TaskPriority } from '../../shared/schemas.js';
 import { groupByPhase, taskProgress } from '../../shared/timeline.js';
 import { Track } from '../components/Display';
 import { downloadCalendar } from '../components/ExportMenu';
+import type { FormError } from '../components/InlineForm';
+import { FormField, InlineForm } from '../components/InlineForm';
 import { TASK_PRIORITY_LABELS } from '../labels';
 import { TaskRow, useTaskActions } from './TaskRow';
 import type { PanelProps } from './types';
@@ -18,20 +19,18 @@ function AddTaskForm({ plan, today, update }: Pick<PanelProps, 'plan' | 'today' 
   const [title, setTitle] = useState('');
   const [due, setDue] = useState(today);
   const [priority, setPriority] = useState<TaskPriority>('medium');
-  const [error, setError] = useState('');
-  const id = useId();
+  const [error, setError] = useState<FormError | null>(null);
 
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault();
+  const submit = () => {
     if (title.trim() === '') {
-      setError('Give the task a name.');
+      setError({ message: 'Give the task a name.', fields: ['name'] });
       return;
     }
-    if (diffDays(today, due) < 0) {
-      setError('Choose today or a later date.');
+    if (!isISODate(due) || diffDays(today, due) < 0) {
+      setError({ message: 'Choose today or a later date.', fields: ['due'] });
       return;
     }
-    setError('');
+    setError(null);
     update(addCustomTask(plan, { title, due, priority }, randomId, new Date()), {
       undoable: true,
       announcement: `Added ${title.trim()}`,
@@ -40,72 +39,55 @@ function AddTaskForm({ plan, today, update }: Pick<PanelProps, 'plan' | 'today' 
   };
 
   return (
-    <form className="inner form" onSubmit={submit} noValidate aria-labelledby={`${id}-title`}>
-      <h3 id={`${id}-title`} className="panel-title">
-        Add your own task
-      </h3>
-      {error && (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      )}
+    <InlineForm heading="Add your own task" error={error} submitLabel="Add task" onSubmit={submit}>
       <div className="field-row">
-        <div className="field">
-          <label className="label" htmlFor={`${id}-name`}>
-            Task
-          </label>
-          <input
-            id={`${id}-name`}
-            className="input"
-            maxLength={LIMITS.shortText}
-            value={title}
-            aria-invalid={error !== '' && title.trim() === ''}
-            onChange={(e) => {
-              setTitle(e.target.value);
-            }}
-          />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor={`${id}-due`}>
-            Due
-          </label>
-          <input
-            id={`${id}-due`}
-            className="input"
-            type="date"
-            min={today}
-            value={due}
-            onChange={(e) => {
-              setDue(e.target.value);
-            }}
-          />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor={`${id}-priority`}>
-            Priority
-          </label>
-          <select
-            id={`${id}-priority`}
-            className="select"
-            value={priority}
-            onChange={(e) => {
-              setPriority(e.target.value as TaskPriority);
-            }}
-          >
-            {TASK_PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {TASK_PRIORITY_LABELS[p]}
-              </option>
-            ))}
-          </select>
-        </div>
+        <FormField name="name" label="Task">
+          {(control) => (
+            <input
+              {...control}
+              className="input"
+              maxLength={LIMITS.shortText}
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+              }}
+            />
+          )}
+        </FormField>
+        <FormField name="due" label="Due">
+          {(control) => (
+            <input
+              {...control}
+              className="input"
+              type="date"
+              min={today}
+              value={due}
+              onChange={(e) => {
+                setDue(e.target.value);
+              }}
+            />
+          )}
+        </FormField>
+        <FormField name="priority" label="Priority">
+          {(control) => (
+            <select
+              {...control}
+              className="select"
+              value={priority}
+              onChange={(e) => {
+                setPriority(e.target.value as TaskPriority);
+              }}
+            >
+              {TASK_PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {TASK_PRIORITY_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
       </div>
-      <div>
-        <button type="submit" className="btn btn-secondary btn-small">
-          Add task
-        </button>
-      </div>
-    </form>
+    </InlineForm>
   );
 }
 
@@ -122,8 +104,7 @@ function RunSheet({ plan, update, refine }: Pick<PanelProps, 'plan' | 'update' |
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('12:00');
   const [day, setDay] = useState('1');
-  const [error, setError] = useState('');
-  const id = useId();
+  const [error, setError] = useState<FormError | null>(null);
   const days = useMemo(() => {
     const byDay = new Map<number, DayOfItem[]>();
     for (const item of plan.dayOf) byDay.set(item.day, [...(byDay.get(item.day) ?? []), item]);
@@ -131,14 +112,19 @@ function RunSheet({ plan, update, refine }: Pick<PanelProps, 'plan' | 'update' |
   }, [plan.dayOf]);
   const multiDay = plan.brief.days > 1;
 
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault();
+  const submit = () => {
     const startMinute = parseTime(time);
     if (title.trim() === '' || startMinute === null) {
-      setError('Add what happens and a time like 18:30.');
+      setError({
+        message: 'Add what happens and a time like 18:30.',
+        fields: [
+          ...(title.trim() === '' ? ['what'] : []),
+          ...(startMinute === null ? ['time'] : []),
+        ],
+      });
       return;
     }
-    setError('');
+    setError(null);
     update(addDayOfItem(plan, { day: Number(day), startMinute, title }, randomId, new Date()), {
       undoable: true,
       announcement: `Added ${title.trim()} at ${formatMinutes(startMinute)}`,
@@ -180,72 +166,12 @@ function RunSheet({ plan, update, refine }: Pick<PanelProps, 'plan' | 'update' |
           </ul>
         </div>
       ))}
-      <form
-        className="form compact-form"
+      <InlineForm
+        label="Add to the run sheet"
+        error={error}
+        submitLabel="Add to run sheet"
         onSubmit={submit}
-        noValidate
-        aria-label="Add to the run sheet"
-      >
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="field-row">
-          <div className="field">
-            <label className="label" htmlFor={`${id}-what`}>
-              What happens
-            </label>
-            <input
-              id={`${id}-what`}
-              className="input"
-              maxLength={LIMITS.shortText}
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-              }}
-            />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor={`${id}-time`}>
-              Time
-            </label>
-            <input
-              id={`${id}-time`}
-              className="input"
-              type="time"
-              value={time}
-              onChange={(e) => {
-                setTime(e.target.value);
-              }}
-            />
-          </div>
-          {multiDay && (
-            <div className="field">
-              <label className="label" htmlFor={`${id}-day`}>
-                Day
-              </label>
-              <select
-                id={`${id}-day`}
-                className="select"
-                value={day}
-                onChange={(e) => {
-                  setDay(e.target.value);
-                }}
-              >
-                {Array.from({ length: plan.brief.days }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    Day {i + 1}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-        <div className="actions">
-          <button type="submit" className="btn btn-secondary btn-small">
-            Add to run sheet
-          </button>
+        actions={
           <button
             type="button"
             className="link-button"
@@ -255,8 +181,57 @@ function RunSheet({ plan, update, refine }: Pick<PanelProps, 'plan' | 'update' |
           >
             Change the run sheet with AI
           </button>
+        }
+      >
+        <div className="field-row">
+          <FormField name="what" label="What happens">
+            {(control) => (
+              <input
+                {...control}
+                className="input"
+                maxLength={LIMITS.shortText}
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                }}
+              />
+            )}
+          </FormField>
+          <FormField name="time" label="Time">
+            {(control) => (
+              <input
+                {...control}
+                className="input"
+                type="time"
+                value={time}
+                onChange={(e) => {
+                  setTime(e.target.value);
+                }}
+              />
+            )}
+          </FormField>
+          {multiDay && (
+            <FormField name="day" label="Day">
+              {(control) => (
+                <select
+                  {...control}
+                  className="select"
+                  value={day}
+                  onChange={(e) => {
+                    setDay(e.target.value);
+                  }}
+                >
+                  {Array.from({ length: plan.brief.days }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      Day {i + 1}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+          )}
         </div>
-      </form>
+      </InlineForm>
     </section>
   );
 }

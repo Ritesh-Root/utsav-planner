@@ -135,13 +135,12 @@ export default function SettingsView() {
               id="import-plan"
               type="file"
               accept=".json,application/json"
+              aria-describedby={importMessage ? 'import-result' : undefined}
               onChange={(e) => void importFile(e)}
             />
+            {/* Announced through the live regions; shown here for sighted users. */}
             {importMessage && (
-              <p
-                className={importMessage.ok ? 'hint' : 'error-text'}
-                role={importMessage.ok ? 'status' : 'alert'}
-              >
+              <p id="import-result" className={importMessage.ok ? 'hint' : 'error-text'}>
                 {importMessage.text}
               </p>
             )}

@@ -33,7 +33,7 @@ export interface AppDeps {
   now?: () => Date;
 }
 
-export const DEFAULT_RATE_LIMITS = {
+const DEFAULT_RATE_LIMITS = {
   api: { windowMs: 60_000, limit: 120 },
   ai: { windowMs: 10 * 60_000, limit: 20 },
 } as const;

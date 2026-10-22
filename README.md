@@ -120,7 +120,7 @@ locally) authenticate to Vertex AI.
 
 ### Testing
 
-- **222 tests** (Vitest) in a node project (shared domain, server, styles) and a jsdom project (client),
+- **230 tests** (Vitest) in a node project (shared domain, server, styles) and a jsdom project (client),
   hermetic: no network, no credentials, no build step, any time zone. CI also runs them on Node 22, 24 and
   26 in three time zones.
 - Highlights: a 500-case property test that budgets always add up, and a 300-run one that they still do
@@ -142,7 +142,8 @@ locally) authenticate to Vertex AI.
   keys, native `<dialog>` with focus return, a focused error summary linking to each field, live regions
   for progress and results, status in words as well as colour, 44 px primary targets, reflow at 320 px.
 - axe-core: 0 violations on every screen in light, dark and high-contrast themes and on a phone, in a real
-  browser (32 checks in `npm run test:e2e`). Every form control has a name, an id and a label.
+  browser (32 axe checks in `npm run test:e2e`, which also checks in a real browser that budgets add up
+  and edits survive a reload). Every form control has a name, an id and a label.
 
 ## Run it
 
@@ -154,7 +155,8 @@ npm run dev:server            # API on :8080
 npm run dev                   # app on :5173, proxied to the API
 ```
 
-`npm run check` runs lint, formatting, type checks, tests with coverage, the build and the bundle budget.
+`npm run check` runs lint, the unused-code check (knip), formatting, type checks, tests with coverage, the build
+and the bundle budget.
 
 ## Deploy
 
@@ -168,9 +170,12 @@ gcloud run deploy utsav-planner --source . --region us-central1 \
 ## Project layout
 
 ```
-src/shared/   constants, schemas, limits, money, budget, timeline, vendors, insights, ics, links, plan, templates, presets
-src/server/   app (createApp), routes, security, errors, logger, config, ai/ (gemini, prompts, schema, normalize, planner, guards)
-src/client/   App, router, api, browserStorage, storage, briefDraft, labels, settings, state/, components/, panels/, views/, assets/, styles/
+src/shared/   constants, schemas, limits, dates, money, budget, timeline, vendors, insights, ics, links, sanitize,
+              plan (+ plan/: build, edits, refine, diff), templates/, presets
+src/server/   main, app (createApp), routes, security, errors, logger, config,
+              ai/ (gemini, prompts, schema, normalize, planner, guards)
+src/client/   main, App, router, api, hooks, offline, browserStorage, storage, briefDraft, labels, settings,
+              state/, components/, panels/, views/, assets/, styles/
 tests/        shared/, server/, client/, styles/, fixtures/, setup/
 scripts/      precompress, bundle-budget, smoke-ai, smoke-live, e2e
 ```

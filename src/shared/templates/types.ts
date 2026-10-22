@@ -26,4 +26,5 @@ export const share = (
   estHigh: 0,
 });
 
+/** Minutes after midnight for a clock time, e.g. `at(18, 30)`. */
 export const at = (hours: number, minutes = 0) => hours * 60 + minutes;
