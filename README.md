@@ -120,7 +120,7 @@ locally) authenticate to Vertex AI.
 
 ### Testing
 
-- **230 tests** (Vitest) in a node project (shared domain, server, styles) and a jsdom project (client),
+- **236 tests** (Vitest) in a node project (shared domain, server, styles) and a jsdom project (client),
   hermetic: no network, no credentials, no build step, any time zone. CI also runs them on Node 22, 24 and
   26 in three time zones.
 - Highlights: a 500-case property test that budgets always add up, and a 300-run one that they still do
@@ -139,8 +139,10 @@ locally) authenticate to Vertex AI.
 - WCAG 2.2 AA throughout, and a **high-contrast mode** with every text pair at 7:1 or better (tested), a
   **simple reading** mode, dark mode, `forced-colors` and reduced-motion support.
 - Skip link, landmarks, one `h1` per view with focus moved to it on navigation, WAI-ARIA tabs with arrow
-  keys, native `<dialog>` with focus return, a focused error summary linking to each field, live regions
-  for progress and results, status in words as well as colour, 44 px primary targets, reflow at 320 px.
+  keys, native `<dialog>` with focus return, a focused error summary linking to each field, one announcer
+  so each change is spoken once, focus that never drops to the page after Undo, menus or dialogs, the page
+  made inert under the phone menu, status in words and shape as well as colour, 44 px controls on touch
+  screens, reflow at 320 px.
 - axe-core: 0 violations on every screen in light, dark and high-contrast themes and on a phone, in a real
   browser (32 axe checks in `npm run test:e2e`, which also checks in a real browser that budgets add up
   and edits survive a reload). Every form control has a name, an id and a label.

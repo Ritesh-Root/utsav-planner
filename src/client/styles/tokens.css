@@ -147,6 +147,12 @@
 }
 
 /* Simple reading: larger text, more air, fewer details. */
+/* Touch screens get 44px controls; simple reading below makes them larger still. */
+@media (pointer: coarse) {
+  :root {
+    --control-height: 44px;
+  }
+}
 :root[data-reading='simple'] {
   --fs-body: 17px;
   --fs-small: 15px;

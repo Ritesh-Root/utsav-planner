@@ -18,14 +18,17 @@ export interface AiRequest {
   label: string;
 }
 
+/** Tokens a call was billed for. */
+export interface AiUsage {
+  promptTokens: number;
+  outputTokens: number;
+  thoughtTokens: number;
+  cachedTokens: number;
+}
+
 export interface AiResponse {
   text: string;
-  usage: {
-    promptTokens: number;
-    outputTokens: number;
-    thoughtTokens: number;
-    cachedTokens: number;
-  };
+  usage: AiUsage;
 }
 
 export type AiErrorKind =
@@ -54,6 +57,8 @@ export class AiError extends Error {
   constructor(
     readonly kind: AiErrorKind,
     message: string = kind,
+    /** What the failed call was still billed for, when the model answered at all. */
+    readonly usage?: AiUsage,
   ) {
     super(message);
     this.name = 'AiError';
@@ -132,21 +137,23 @@ export function createGeminiClient(options: {
             abortSignal: signal,
           },
         });
-        if (response.promptFeedback?.blockReason) throw new AiError('blocked');
-        const finishReason = response.candidates?.[0]?.finishReason;
-        if (finishReason && BLOCKED_FINISH.has(finishReason)) throw new AiError('blocked');
-        if (finishReason === FinishReason.MAX_TOKENS) throw new AiError('max-tokens');
-        const text = response.text;
-        if (!text) throw new AiError('empty');
-        return {
-          text,
-          usage: {
-            promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
-            outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
-            thoughtTokens: response.usageMetadata?.thoughtsTokenCount ?? 0,
-            cachedTokens: response.usageMetadata?.cachedContentTokenCount ?? 0,
-          },
+        const usage: AiUsage = {
+          promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+          outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+          thoughtTokens: response.usageMetadata?.thoughtsTokenCount ?? 0,
+          cachedTokens: response.usageMetadata?.cachedContentTokenCount ?? 0,
         };
+        if (response.promptFeedback?.blockReason) throw new AiError('blocked', undefined, usage);
+        const finishReason = response.candidates?.[0]?.finishReason;
+        if (finishReason && BLOCKED_FINISH.has(finishReason)) {
+          throw new AiError('blocked', undefined, usage);
+        }
+        if (finishReason === FinishReason.MAX_TOKENS) {
+          throw new AiError('max-tokens', undefined, usage);
+        }
+        const text = response.text;
+        if (!text) throw new AiError('empty', undefined, usage);
+        return { text, usage };
       } catch (error) {
         throw toAiError(error, signal);
       }

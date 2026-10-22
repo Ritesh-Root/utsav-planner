@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { brotliCompressSync } from 'node:zlib';
+import { brotliCompressSync, gzipSync } from 'node:zlib';
 
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -22,6 +22,7 @@ describe('static files', () => {
     writeFileSync(join(dir, 'index.html'), '<!doctype html><title>Utsav</title>');
     writeFileSync(join(dir, 'assets', 'app-abc123.js'), 'console.log(1)');
     writeFileSync(join(dir, 'assets', 'app-abc123.js.br'), brotliCompressSync('console.log(1)'));
+    writeFileSync(join(dir, 'assets', 'app-abc123.js.gz'), gzipSync('console.log(1)'));
     writeFileSync(join(dir, 'theme-init.js'), '// theme');
   });
   afterAll(() => {
@@ -47,10 +48,10 @@ describe('static files', () => {
     expect(res.headers['cache-control']).toBe('public, max-age=31536000, immutable');
   });
 
-  it('serves the precompressed brotli copy when the browser accepts it', async () => {
+  it('serves the precompressed brotli copy when the browser accepts it, whatever the order', async () => {
     const res = await request(app())
       .get('/assets/app-abc123.js')
-      .set('Accept-Encoding', 'br, gzip')
+      .set('Accept-Encoding', 'gzip, deflate, br, zstd')
       .buffer(true)
       .parse((r, done) => {
         const chunks: Buffer[] = [];
@@ -64,6 +65,23 @@ describe('static files', () => {
     expect(res.headers['content-type']).toContain('javascript');
     expect(res.headers['cache-control']).toContain('immutable');
     expect(res.headers.vary).toContain('Accept-Encoding');
+  });
+
+  it('falls back to the gzip copy, and answers missing files with 404', async () => {
+    const res = await request(app())
+      .get('/assets/app-abc123.js')
+      .set('Accept-Encoding', 'gzip')
+      .buffer(true)
+      .parse((r, done) => {
+        r.on('data', () => undefined);
+        r.on('end', () => {
+          done(null, null);
+        });
+      })
+      .expect(200);
+    expect(res.headers['content-encoding']).toBe('gzip');
+    await request(app()).get('/assets/app-old999.js').expect(404);
+    await request(app()).get('/manifest.webmanifest').expect(404);
   });
 
   it('lets unfingerprinted public files be cached briefly', async () => {

@@ -25,6 +25,7 @@ export function ExportMenu({ plan }: { plan: Plan }) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const wrapper = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const firstItem = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -34,7 +35,9 @@ export function ExportMenu({ plan }: { plan: Plan }) {
       if (!wrapper.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      trigger.current?.focus();
     };
     document.addEventListener('pointerdown', onPointer);
     document.addEventListener('keydown', onKey);
@@ -47,11 +50,14 @@ export function ExportMenu({ plan }: { plan: Plan }) {
   const run = (action: () => void) => () => {
     action();
     setOpen(false);
+    // The menu item is about to disappear; return focus to the button that opened it.
+    trigger.current?.focus();
   };
 
   return (
     <div className="menu-wrap" ref={wrapper}>
       <button
+        ref={trigger}
         type="button"
         className="btn btn-secondary"
         aria-expanded={open}

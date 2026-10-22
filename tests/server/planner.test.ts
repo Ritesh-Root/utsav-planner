@@ -119,6 +119,29 @@ describe('planner.plan', () => {
     expect((await planner.plan({ ...birthdayBrief, guests: 40 }, TODAY)).meta.source).toBe('ai');
   });
 
+  it('logs the tokens a failed call was billed for', async () => {
+    const warnings: Record<string, unknown>[] = [];
+    const planner = createPlanner({
+      ai: new FakeAi(
+        reply('not json'),
+        new AiError('max-tokens', undefined, {
+          promptTokens: 900,
+          outputTokens: 8192,
+          thoughtTokens: 40,
+          cachedTokens: 0,
+        }),
+      ),
+      logger: { ...silentLogger, warn: (_message, fields) => warnings.push(fields ?? {}) },
+      dailyCap: 100,
+      now: () => NOW,
+      newId: sequentialIds(),
+      sleep: () => Promise.resolve(),
+    });
+    await planner.plan(birthdayBrief, TODAY);
+    expect(warnings[0]).toMatchObject({ outcome: 'invalid', promptTokens: 100, outputTokens: 200 });
+    expect(warnings[1]).toMatchObject({ outcome: 'max-tokens', outputTokens: 8192 });
+  });
+
   it('never opens the breaker for answers that could not be used', async () => {
     // Invalid output is shaped by the request, so one user must not trip AI for everyone.
     const ai = new FakeAi(reply({ title: 'thin' }));

@@ -77,7 +77,6 @@ export default function NewPlanView({ preset }: { preset: EventType | null }) {
       const message =
         error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
       setFailure(message);
-      announce(message, 'assertive');
     }
   };
 

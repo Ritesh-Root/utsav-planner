@@ -146,7 +146,10 @@ export function AmountInput({
   );
 }
 
-/** A message after an undoable change, with Undo; screen readers hear it via the live region. */
+/**
+ * A message after an undoable change, with Undo. Not itself a live region: the
+ * announcer already speaks the message, so screen readers hear it once.
+ */
 export function Toast({
   message,
   action,
@@ -157,7 +160,7 @@ export function Toast({
   onDismiss: () => void;
 }) {
   return (
-    <div className="toast" role="status">
+    <div className="toast">
       <span>{message}</span>
       {action && (
         <button type="button" className="btn btn-small" onClick={action.run}>

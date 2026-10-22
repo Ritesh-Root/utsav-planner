@@ -51,9 +51,11 @@ function Routes() {
   }
   return (
     <Shell route={route}>
-      <ErrorBoundary key={route.name}>
-        <Suspense fallback={<p className="meta">Loading…</p>}>{view}</Suspense>
-      </ErrorBoundary>
+      {/* One Suspense boundary for every route, so a route change inside a transition keeps
+          the current screen until the next view is ready instead of flashing "Loading…". */}
+      <Suspense fallback={<p className="meta">Loading…</p>}>
+        <ErrorBoundary key={route.name}>{view}</ErrorBoundary>
+      </Suspense>
     </Shell>
   );
 }

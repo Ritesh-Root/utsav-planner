@@ -291,10 +291,13 @@ export default function PlanView({ id, tab }: { id: string; tab: PlanTab }) {
               store.undo(plan.id);
               setToast(null);
               announce('Change undone.');
+              // The toast holding focus is about to go; keep the keyboard user on the page.
+              heading.current?.focus();
             },
           }}
           onDismiss={() => {
             setToast(null);
+            heading.current?.focus();
           }}
         />
       )}

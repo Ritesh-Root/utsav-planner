@@ -57,8 +57,13 @@ function precompressed(assetsDir: string): RequestHandler {
       next();
       return;
     }
-    const preferred = req.acceptsEncodings('br', 'gzip');
-    const encoding = preferred === 'br' || preferred === 'gzip' ? preferred : null;
+    // Browsers list gzip first ("gzip, deflate, br"), so ask about brotli on its own:
+    // the quality-11 .br files are the smallest whenever the client accepts them.
+    const encoding = req.acceptsEncodings('br')
+      ? 'br'
+      : req.acceptsEncodings('gzip')
+        ? 'gzip'
+        : null;
     const suffix = encoding === 'br' ? '.br' : encoding === 'gzip' ? '.gz' : null;
     if (!suffix || !available.has(name + suffix)) {
       next();
@@ -133,8 +138,17 @@ export function createApp(deps: AppDeps): Express {
         },
       }),
     );
+    // A missing file is a 404, not the app shell: an old tab asking for a replaced
+    // chunk then fails cleanly instead of parsing HTML as JavaScript.
+    app.use('/assets', (_req, res) => {
+      res.status(404).end();
+    });
     // The SPA uses hash routing, so any other page path just gets the app shell.
-    app.get('/{*page}', (_req, res) => {
+    app.get('/{*page}', (req, res) => {
+      if (extname(req.path)) {
+        res.status(404).end();
+        return;
+      }
       res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(join(staticDir, 'index.html'));
     });

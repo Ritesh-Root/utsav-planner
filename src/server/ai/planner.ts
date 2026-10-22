@@ -16,7 +16,7 @@ import { buildTemplateDraft } from '../../shared/templates/index.js';
 import { daysUntil } from '../../shared/timeline.js';
 import { HttpError } from '../errors.js';
 import type { Logger } from '../logger.js';
-import type { AiClient, AiErrorKind } from './gemini.js';
+import type { AiClient, AiErrorKind, AiUsage } from './gemini.js';
 import { AiError, toAiError } from './gemini.js';
 import { createCircuitBreaker, createDailyBudget } from './guards.js';
 import { InvalidOutputError, normalizePlanDraft, normalizeRefine } from './normalize.js';
@@ -156,12 +156,14 @@ export function createPlanner(deps: PlannerDeps): Planner {
       if (!budget.tryConsume()) throw new PlannerFailure('cap');
       const remaining = AI_LIMITS.totalBudgetMs - (clock() - started);
       const callStarted = clock();
+      let usage: AiUsage | undefined;
       try {
         const response = await ai.generate({
           ...request,
           label,
           timeoutMs: Math.min(request.timeoutMs, remaining),
         });
+        usage = response.usage;
         let raw: unknown;
         try {
           raw = JSON.parse(response.text);
@@ -177,10 +179,7 @@ export function createPlanner(deps: PlannerDeps): Planner {
           outcome: 'ok',
           latencyMs: clock() - callStarted,
           promptChars: request.prompt.length,
-          promptTokens: response.usage.promptTokens,
-          outputTokens: response.usage.outputTokens,
-          thoughtTokens: response.usage.thoughtTokens,
-          cachedTokens: response.usage.cachedTokens,
+          ...usage,
         });
         return value;
       } catch (error) {
@@ -197,6 +196,8 @@ export function createPlanner(deps: PlannerDeps): Planner {
           // Messages hold no user text (e.g. "too few ideas"); names expose code bugs.
           reason: error instanceof Error ? `${error.name}: ${error.message}` : 'unknown',
           latencyMs: clock() - callStarted,
+          // An unusable answer is still billed; keep its tokens in the logs.
+          ...(usage ?? (error instanceof AiError ? error.usage : undefined)),
         });
         const timeLeft = AI_LIMITS.totalBudgetMs - (clock() - started);
         if (!retryable || attempt >= 2 || timeLeft < AI_LIMITS.minRetryWindowMs) throw error;

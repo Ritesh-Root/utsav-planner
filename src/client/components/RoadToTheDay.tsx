@@ -10,15 +10,31 @@ const HEIGHT = 56;
 const PAD = 8;
 const TRACK_Y = 22;
 
-function Dot({ kind }: { kind: 'done' | 'late' | 'open' }) {
+type MarkKind = 'done' | 'late' | 'open';
+
+/** A task on the road: late tasks are diamonds, so status never rests on colour alone. */
+function TaskMark({ kind, cx, cy, r }: { kind: MarkKind; cx: number; cy: number; r: number }) {
+  const className = `road-task${kind === 'done' ? ' is-done' : kind === 'late' ? ' is-late' : ''}`;
+  if (kind === 'late') {
+    const side = r * 1.6;
+    return (
+      <rect
+        className={className}
+        x={cx - side / 2}
+        y={cy - side / 2}
+        width={side}
+        height={side}
+        transform={`rotate(45 ${cx} ${cy})`}
+      />
+    );
+  }
+  return <circle className={className} cx={cx} cy={cy} r={r} />;
+}
+
+function Dot({ kind }: { kind: MarkKind }) {
   return (
     <svg className="road-key" viewBox="0 0 12 12" aria-hidden="true">
-      <circle
-        className={`road-task${kind === 'done' ? ' is-done' : kind === 'late' ? ' is-late' : ''}`}
-        cx="6"
-        cy="6"
-        r="4.5"
-      />
+      <TaskMark kind={kind} cx={6} cy={6} r={4.5} />
     </svg>
   );
 }
@@ -87,13 +103,7 @@ export function RoadToTheDay({ plan, today }: { plan: Plan; today: string }) {
               <line className="road-done" x1={PAD} y1={TRACK_Y} x2={layout.todayX} y2={TRACK_Y} />
             )}
             {layout.marks.map((mark) => (
-              <circle
-                key={mark.id}
-                className={`road-task${mark.kind === 'done' ? ' is-done' : mark.kind === 'late' ? ' is-late' : ''}`}
-                cx={mark.cx}
-                cy={TRACK_Y}
-                r="5"
-              />
+              <TaskMark key={mark.id} kind={mark.kind} cx={mark.cx} cy={TRACK_Y} r={5} />
             ))}
             <line className="road-today" x1={layout.todayX} y1={8} x2={layout.todayX} y2={36} />
             <text

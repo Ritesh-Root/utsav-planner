@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Component } from 'react';
+import { Component, createRef } from 'react';
 
 /**
  * Shows a way out instead of a blank page when a view fails to load (offline, or
@@ -7,16 +7,34 @@ import { Component } from 'react';
  */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   override state = { failed: false };
+  private readonly heading = createRef<HTMLHeadingElement>();
 
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+
+  override componentDidMount() {
+    this.announceFailure();
+  }
+
+  override componentDidUpdate() {
+    this.announceFailure();
+  }
+
+  /** Like every other view: a title of its own, and keyboard focus on the heading. */
+  private announceFailure() {
+    if (!this.state.failed) return;
+    document.title = 'Page couldn’t load · Utsav';
+    this.heading.current?.focus();
   }
 
   override render() {
     if (!this.state.failed) return this.props.children;
     return (
       <div className="title-text" role="alert">
-        <h1 className="title">This page couldn’t load</h1>
+        <h1 ref={this.heading} tabIndex={-1} className="title">
+          This page couldn’t load
+        </h1>
         <p className="meta">
           Check your connection, then reload. Your plans are safe in this browser.
         </p>

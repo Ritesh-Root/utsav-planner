@@ -321,6 +321,8 @@ describe('things going wrong', () => {
     );
     expect(alertText()).toContain('This page couldn’t load');
     expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+    expect(document.title).toBe('Page couldn’t load · Utsav');
   });
 
   it('explains a cleared date instead of failing silently', async () => {
@@ -402,5 +404,70 @@ describe('things going wrong', () => {
     });
     expect(signal?.aborted).toBe(true);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(plan.brief.title);
+  });
+});
+
+describe('keyboard focus after changes', () => {
+  it('speaks each change once and keeps focus on the page after Undo or Dismiss', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PlanView id="plan-1" tab="overview" />, [planFor()]);
+    const heading = screen.getByRole('heading', { level: 1 });
+    await user.click(screen.getAllByRole('checkbox')[0]!);
+    const undo = await screen.findByRole('button', { name: 'Undo' });
+    expect(undo.closest('[role="status"], [aria-live]')).toBeNull();
+    undo.focus();
+    await user.keyboard('{Enter}');
+    expect(heading).toHaveFocus();
+    await user.click(screen.getAllByRole('checkbox')[0]!);
+    await user.click(await screen.findByRole('button', { name: 'Dismiss' }));
+    expect(heading).toHaveFocus();
+  });
+
+  it('returns focus to Export when its menu closes', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PlanView id="plan-1" tab="overview" />, [planFor()]);
+    const exportButton = screen.getByRole('button', { name: 'Export' });
+    await user.click(exportButton);
+    await user.keyboard('{Escape}');
+    expect(exportButton).toHaveFocus();
+    expect(exportButton).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('moves focus to Apply on a preview and back to the request on an error', async () => {
+    const user = userEvent.setup();
+    const plan = planFor();
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse({ error: { code: 'AI_UNAVAILABLE', message: 'Gemini is busy.' } }, 503),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({
+            result: { message: 'Done.', briefPatch: null, sections: {} },
+            meta: { source: 'ai', fallbackReason: null, cached: false, latencyMs: 5, model: 'm' },
+          }),
+        ),
+    );
+    renderWithProviders(<PlanView id="plan-1" tab="overview" />, [plan]);
+    await user.click(screen.getByRole('button', { name: 'Refine with AI' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Refine with AI' });
+    const request = within(dialog).getByLabelText('Your request');
+    await user.type(request, 'More flowers');
+    await user.click(within(dialog).getByRole('button', { name: 'Ask Utsav' }));
+    expect(await within(dialog).findByText('Gemini is busy.')).toBeInTheDocument();
+    expect(request).toHaveFocus();
+    await user.click(within(dialog).getByRole('button', { name: 'Ask Utsav' }));
+    expect(await within(dialog).findByRole('button', { name: 'Apply changes' })).toHaveFocus();
+  });
+
+  it('puts the page out of reach while the phone menu covers it', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<App />);
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+    expect(document.querySelector('.main')).toHaveAttribute('inert');
+    await user.keyboard('{Escape}');
+    expect(document.querySelector('.main')).not.toHaveAttribute('inert');
   });
 });

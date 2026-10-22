@@ -281,6 +281,7 @@ a {
   background: var(--raised);
 }
 .link-button {
+  min-height: 24px;
   padding: 0;
   border: 0;
   background: none;
@@ -319,7 +320,8 @@ a {
 .btn:active:not(:disabled) {
   transform: translateY(1px);
 }
-.btn:disabled {
+.btn:disabled,
+.btn[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.7;
 }
@@ -1096,9 +1098,12 @@ details > summary {
     bottom: 16px;
     left: 16px;
   }
-  /* Room under the last control so the Undo toast never covers it. */
+  /* Room under the last control, and around any focused one, so the Undo toast never covers it. */
   .canvas {
     padding-bottom: 160px;
+  }
+  html {
+    scroll-padding-bottom: 160px;
   }
 }
 

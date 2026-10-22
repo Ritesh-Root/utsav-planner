@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+
 import birthday192 from '../assets/birthday-192.webp';
 import birthday96 from '../assets/birthday-96.webp';
 import community192 from '../assets/community-192.webp';
@@ -46,6 +48,11 @@ export default function HomeView() {
   const { plans, ready } = usePlanStore();
   const heading = usePageFocus<HTMLHeadingElement>('home');
   useDocumentTitle('Plan a celebration');
+  // With saved plans on the page, fetch the workspace's code now so opening one is instant.
+  const hasPlans = plans.length > 0;
+  useEffect(() => {
+    if (hasPlans) void import('./PlanView').catch(() => undefined);
+  }, [hasPlans]);
 
   return (
     <>

@@ -124,7 +124,8 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
       </a>
       <div className="shell">
         <Sidebar route={route} open={menuOpen} onClose={close} />
-        <div className="main">
+        {/* While the phone menu covers the screen, the page under it is out of reach. */}
+        <div className="main" inert={menuOpen}>
           <header className="topbar">
             <a className="brand" href="#/">
               <BrandMark />

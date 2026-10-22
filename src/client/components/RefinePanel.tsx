@@ -56,11 +56,18 @@ export function RefinePanel({
   const [instruction, setInstruction] = useState(request.instruction);
   const [phase, setPhase] = useState<Phase>({ name: 'idle' });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const applyRef = useRef<HTMLButtonElement>(null);
   const controller = useRef<AbortController | null>(null);
   const announce = useAnnounce();
   const hintId = useId();
 
   useEffect(() => () => controller.current?.abort(), []);
+
+  // Keep keyboard focus where the next step is: Apply on a preview, the request otherwise.
+  useEffect(() => {
+    if (phase.name === 'preview') applyRef.current?.focus();
+    else if (phase.name === 'error') textareaRef.current?.focus();
+  }, [phase.name]);
 
   const close = () => {
     controller.current?.abort();
@@ -69,6 +76,7 @@ export function RefinePanel({
 
   const submit = async (event: SubmitEvent) => {
     event.preventDefault();
+    if (phase.name === 'working') return;
     const text = instruction.trim();
     if (text.length < LIMITS.instructionMin) {
       setPhase({ name: 'error', message: 'Tell Utsav what to change, in a few words.' });
@@ -103,7 +111,6 @@ export function RefinePanel({
       const message =
         error instanceof ApiError ? error.message : 'Something went wrong. Your plan is unchanged.';
       setPhase({ name: 'error', message });
-      announce(message, 'assertive');
     }
   };
 
@@ -126,6 +133,7 @@ export function RefinePanel({
             <button
               type="button"
               className="btn btn-primary"
+              ref={applyRef}
               onClick={() => {
                 onApply(phase.proposed, phase.summary);
               }}
@@ -174,7 +182,7 @@ export function RefinePanel({
               maxLength={LIMITS.instructionMax}
               aria-describedby={hintId}
               value={instruction}
-              disabled={phase.name === 'working'}
+              readOnly={phase.name === 'working'}
               onChange={(e) => {
                 setInstruction(e.target.value);
               }}
@@ -211,7 +219,12 @@ export function RefinePanel({
             <button type="button" className="btn btn-quiet" onClick={close}>
               {phase.name === 'working' ? 'Cancel' : 'Close'}
             </button>
-            <button type="submit" className="btn btn-primary" disabled={phase.name === 'working'}>
+            {/* aria-disabled, not disabled, so focus stays on the button while Utsav works. */}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              aria-disabled={phase.name === 'working'}
+            >
               Ask Utsav
             </button>
           </div>
