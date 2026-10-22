@@ -21,6 +21,10 @@ export default defineConfig(
     },
     rules: {
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
       'no-restricted-syntax': [
         'error',
         {
@@ -38,6 +42,16 @@ export default defineConfig(
   {
     files: ['src/server/**/*.ts', 'scripts/**', 'tests/server/**', '*.config.{js,ts}'],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // Tests read untyped HTTP bodies and assert on fixtures they just built.
+    files: ['tests/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/non-nullable-type-assertion-style': 'off',
+    },
   },
   {
     files: ['**/*.{js,mjs}'],
