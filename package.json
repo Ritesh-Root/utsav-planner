@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:server": "tsx watch src/server/main.ts",
+    "dev:server": "tsx watch --env-file-if-exists=.env src/server/main.ts",
     "build": "vite build && tsc -p tsconfig.build.json",
     "start": "node dist/node/server/main.js",
     "lint": "eslint . --max-warnings=0",

@@ -1,0 +1,13 @@
+.git
+.github
+.taste-skill
+node_modules
+dist
+coverage
+tests
+docs
+*.md
+.env
+.env.*
+Dockerfile
+.dockerignore
