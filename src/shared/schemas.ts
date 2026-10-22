@@ -441,3 +441,24 @@ export interface ResponseMeta {
   latencyMs: number;
   model: string | null;
 }
+
+export const ResponseMetaSchema = z.object({
+  source: z.enum(['ai', 'template']),
+  fallbackReason: z.string().nullable(),
+  cached: z.boolean(),
+  latencyMs: z.number(),
+  model: z.string().nullable(),
+});
+
+/** What `/api/plan` returns; the browser checks it before trusting it. */
+export const PlanResponseSchema = z.object({ plan: PlanSchema, meta: ResponseMetaSchema });
+
+/** What `/api/refine` returns. */
+export const RefineResponseSchema = z.object({
+  result: z.object({
+    message: z.string(),
+    briefPatch: BriefPatchSchema.nullable(),
+    sections: AiRefineSectionsSchema,
+  }),
+  meta: ResponseMetaSchema,
+});

@@ -1,0 +1,39 @@
+@media print {
+  :root {
+    --surface: #ffffff;
+    --text: #000000;
+    --muted: #333333;
+  }
+  body {
+    background: #ffffff;
+    font-size: 11pt;
+  }
+  .sidebar,
+  .topbar,
+  .actions,
+  .tabs,
+  .toast,
+  .skip-link,
+  .no-print {
+    display: none !important;
+  }
+  .shell {
+    display: block;
+  }
+  .canvas {
+    max-width: none;
+    padding: 0;
+  }
+  .panel {
+    padding: 0 0 12pt;
+    break-inside: avoid;
+  }
+  .span-4,
+  .span-6,
+  .span-8 {
+    grid-column: span 12;
+  }
+  a {
+    color: #000000;
+  }
+}

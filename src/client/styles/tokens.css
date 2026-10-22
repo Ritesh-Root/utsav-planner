@@ -1,0 +1,156 @@
+/* Self-hosted so the strict CSP (font-src 'self') holds. SIL Open Font License, see ./fonts. */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('./fonts/instrument-sans-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  /* Carries the rupee sign (U+20B9). */
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('./fonts/instrument-sans-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/instrument-serif-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+2000-206F, U+20AC;
+}
+
+/* Editorial greeting (light): tonal panels, one deep-teal hue kept for data and focus. */
+:root {
+  color-scheme: light;
+  --ground: #ffffff;
+  --surface: #f9f9f9;
+  --raised: #ffffff;
+  --active: #ededeb;
+  --border: #eaeaea;
+  --rule: #ececea;
+  --control: #858581; /* 3.5:1 on white: input borders meet WCAG 1.4.11 */
+  --text: #1f201d;
+  --muted: #5c5c5a;
+  --accent: #1b6e66;
+  --accent-soft: #dcefec;
+  --primary: #1f201d;
+  --primary-ink: #ffffff;
+  --positive: #2e7d32;
+  --negative: #b42318;
+  --warning: #92400e;
+  --pill-positive-bg: #dcfae5;
+  --pill-positive-ink: #04250e;
+  --pill-negative-bg: #fdecea;
+  --pill-negative-ink: #7a1d14;
+  --pill-warning-bg: #fffbeb;
+  --pill-warning-ink: #92400e;
+  --pill-neutral-bg: #efefed;
+  --pill-neutral-ink: #3d3d3a;
+  --track: #e4e4e1;
+  --focus: #1b6e66;
+  --scrim: rgb(20 20 18 / 45%);
+
+  --font: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-title: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --fs-title: 48px;
+  --fs-figure: 32px;
+  --fs-lead: 16px;
+  --fs-body: 14px;
+  --fs-small: 12px;
+  --lh-body: 1.5;
+
+  --radius-card: 22px;
+  --radius-inner: 14px;
+  --radius-field: 12px;
+  --radius-control: 999px;
+  --gap: 16px;
+  --pad: 20px;
+  --control-height: 38px;
+  --sidebar-width: 240px;
+  --canvas-max: 1100px;
+
+  --t-press: 120ms;
+  --t-ui: 180ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ground: #0b0b0a;
+  --surface: #161615;
+  --raised: #1f1f1d;
+  --active: #262624;
+  --border: #2b2b29;
+  --rule: #232321;
+  --control: #77776f;
+  --text: #f4f4f1;
+  --muted: #b4b4af;
+  --accent: #5cc2b6;
+  --accent-soft: #163b37;
+  --primary: #f4f4f1;
+  --primary-ink: #0b0b0a;
+  --positive: #5fc97a;
+  --negative: #f07a6b;
+  --warning: #e5a93b;
+  --pill-positive-bg: #15301c;
+  --pill-positive-ink: #8fe0a4;
+  --pill-negative-bg: #3a1a16;
+  --pill-negative-ink: #ffb3a8;
+  --pill-warning-bg: #33280f;
+  --pill-warning-ink: #f3c46b;
+  --pill-neutral-bg: #2a2a28;
+  --pill-neutral-ink: #e2e2de;
+  --track: #33332f;
+  --focus: #5cc2b6;
+  --scrim: rgb(0 0 0 / 65%);
+}
+
+/* High contrast: every text and control pair reaches 7:1 or more. */
+:root[data-theme='contrast'] {
+  color-scheme: light;
+  --ground: #ffffff;
+  --surface: #ffffff;
+  --raised: #ffffff;
+  --active: #e6e6e6;
+  --border: #000000;
+  --rule: #4a4a4a;
+  --control: #000000;
+  --text: #000000;
+  --muted: #262626;
+  --accent: #00463f;
+  --accent-soft: #d6ebe8;
+  --primary: #000000;
+  --primary-ink: #ffffff;
+  --positive: #0b4f14;
+  --negative: #8a1206;
+  --warning: #5c2600;
+  --pill-positive-bg: #ffffff;
+  --pill-positive-ink: #0b4f14;
+  --pill-negative-bg: #ffffff;
+  --pill-negative-ink: #8a1206;
+  --pill-warning-bg: #ffffff;
+  --pill-warning-ink: #5c2600;
+  --pill-neutral-bg: #ffffff;
+  --pill-neutral-ink: #000000;
+  --track: #8c8c8c;
+  --focus: #000000;
+}
+
+/* Simple reading: larger text, more air, fewer details. */
+:root[data-reading='simple'] {
+  --fs-body: 17px;
+  --fs-small: 15px;
+  --fs-lead: 19px;
+  --lh-body: 1.7;
+  --control-height: 46px;
+}
