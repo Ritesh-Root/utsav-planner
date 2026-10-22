@@ -4,7 +4,13 @@ import { TASK_PRIORITIES } from '../../shared/constants.js';
 import { diffDays, formatMinutes, isISODate } from '../../shared/dates.js';
 import { LIMITS } from '../../shared/limits.js';
 import { googleCalendarUrl } from '../../shared/links.js';
-import { addCustomTask, addDayOfItem, randomId, removeDayOfItem } from '../../shared/plan.js';
+import {
+  addCustomTask,
+  addDayOfItem,
+  planIsFull,
+  randomId,
+  removeDayOfItem,
+} from '../../shared/plan.js';
 import type { DayOfItem, TaskPriority } from '../../shared/schemas.js';
 import { groupByPhase, taskProgress } from '../../shared/timeline.js';
 import { Track } from '../components/Display';
@@ -22,6 +28,13 @@ function AddTaskForm({ plan, today, update }: Pick<PanelProps, 'plan' | 'today' 
   const [error, setError] = useState<FormError | null>(null);
 
   const submit = () => {
+    if (planIsFull(plan, 'tasks')) {
+      setError({
+        message: 'This plan already holds as many tasks as Utsav keeps. Remove one first.',
+        fields: [],
+      });
+      return;
+    }
     if (title.trim() === '') {
       setError({ message: 'Give the task a name.', fields: ['name'] });
       return;
@@ -113,6 +126,14 @@ function RunSheet({ plan, update, refine }: Pick<PanelProps, 'plan' | 'update' |
   const multiDay = plan.brief.days > 1;
 
   const submit = () => {
+    if (planIsFull(plan, 'dayOf')) {
+      setError({
+        message:
+          'This plan already holds as many run-sheet items as Utsav keeps. Remove one first.',
+        fields: [],
+      });
+      return;
+    }
     const startMinute = parseTime(time);
     if (title.trim() === '' || startMinute === null) {
       setError({

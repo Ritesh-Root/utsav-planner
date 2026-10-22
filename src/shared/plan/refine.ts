@@ -77,6 +77,24 @@ function claimer<T extends { id: string }>(items: readonly T[]) {
   };
 }
 
+/**
+ * The model's items that fit under a section's cap beside the user's kept ones. Its
+ * versions of the user's own items always fit; new suggestions fill what room is left.
+ */
+function fitting<T>(
+  fromModel: readonly T[],
+  keptCount: number,
+  max: number,
+  isUsers: (item: T) => boolean,
+): T[] {
+  let room = max - keptCount - fromModel.filter(isUsers).length;
+  return fromModel.filter((item) => {
+    if (isUsers(item)) return true;
+    room -= 1;
+    return room >= 0;
+  });
+}
+
 export interface MergeOptions {
   today: string;
   now: Date;
@@ -100,7 +118,14 @@ export function mergeRefinement(plan: Plan, result: RefineResult, options: Merge
     const entries = sections.budget.map((item) => entryFromAi(item, ids.claim(item.id)));
     const kept = plan.budget.filter((l) => !ids.isClaimed(l.id) && (l.locked || l.actual > 0));
     const keptEntries = kept.map(entryFromLine);
-    next = { ...next, budget: buildBudgetLines([...entries, ...keptEntries], brief.budget, newId) };
+    // One place is held back for the contingency line the builder may add.
+    const fitted = fitting(
+      entries,
+      keptEntries.length,
+      LIMITS.planBudgetLinesMax - 1,
+      (entry) => Boolean(entry.previous?.locked) || (entry.previous?.actual ?? 0) > 0,
+    );
+    next = { ...next, budget: buildBudgetLines([...fitted, ...keptEntries], brief.budget, newId) };
   }
 
   if (sections.timeline) {
@@ -118,7 +143,8 @@ export function mergeRefinement(plan: Plan, result: RefineResult, options: Merge
         : fresh;
     });
     const kept = plan.tasks.filter((t) => !ids.isClaimed(t.id) && (t.done || t.custom));
-    next = { ...next, tasks: sortTasks([...updated, ...kept]) };
+    const fitted = fitting(updated, kept.length, LIMITS.planTasksMax, (t) => t.done || t.custom);
+    next = { ...next, tasks: sortTasks([...fitted, ...kept]) };
   }
 
   if (sections.vendors) {
@@ -138,7 +164,8 @@ export function mergeRefinement(plan: Plan, result: RefineResult, options: Merge
         : fresh;
     });
     const kept = plan.vendors.filter((v) => !ids.isClaimed(v.id) && vendorHasUserData(v));
-    next = { ...next, vendors: [...updated, ...kept].sort(byBookBy) };
+    const fitted = fitting(updated, kept.length, LIMITS.planVendorsMax, vendorHasUserData);
+    next = { ...next, vendors: [...fitted, ...kept].sort(byBookBy) };
   }
 
   if (sections.ideas) {
@@ -148,7 +175,8 @@ export function mergeRefinement(plan: Plan, result: RefineResult, options: Merge
       return { ...makeIdea(item, previous?.id ?? newId('idea')), saved: previous?.saved ?? false };
     });
     const kept = plan.ideas.filter((idea) => !ids.isClaimed(idea.id) && idea.saved);
-    next = { ...next, ideas: [...kept, ...updated] };
+    const fitted = fitting(updated, kept.length, LIMITS.planIdeasMax, (idea) => idea.saved);
+    next = { ...next, ideas: [...kept, ...fitted] };
   }
 
   if (sections.dayOf) {

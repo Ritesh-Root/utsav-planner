@@ -6,13 +6,8 @@ import { buildOfflinePlan } from '../../src/client/offline';
 import { hrefFor, parseRoute } from '../../src/client/router';
 import { loadSettings, resolveTheme, saveSettings } from '../../src/client/settings';
 import { storeReducer } from '../../src/client/state/store';
-import {
-  PLANS_KEY,
-  parsePlanFile,
-  planFileName,
-  readPlans,
-  writePlans,
-} from '../../src/client/storage';
+import { PLANS_KEY, parsePlanFile, planFileName, readPlans } from '../../src/client/storage';
+import { writePlans } from '../../src/client/browserStorage';
 import { PlanSchema } from '../../src/shared/schemas.js';
 import { NOW, TODAY, birthdayBrief, templatePlan } from '../fixtures/plans';
 import { jsonResponse } from './helpers';

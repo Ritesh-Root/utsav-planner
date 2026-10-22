@@ -5,7 +5,13 @@ import { addDays, formatDate, isISODate } from '../../shared/dates.js';
 import { LIMITS } from '../../shared/limits.js';
 import { googleMapsSearchUrl } from '../../shared/links.js';
 import type { VendorChanges } from '../../shared/plan.js';
-import { addCustomVendor, randomId, removeVendor, updateVendor } from '../../shared/plan.js';
+import {
+  addCustomVendor,
+  planIsFull,
+  randomId,
+  removeVendor,
+  updateVendor,
+} from '../../shared/plan.js';
 import type { Vendor, VendorStatus } from '../../shared/schemas.js';
 import { vendorProgress, vendorState } from '../../shared/vendors.js';
 import { AmountInput, Pill, Track } from '../components/Display';
@@ -162,6 +168,13 @@ function AddVendorForm({ plan, today, update }: Pick<PanelProps, 'plan' | 'today
   const [error, setError] = useState<FormError | null>(null);
 
   const submit = () => {
+    if (planIsFull(plan, 'vendors')) {
+      setError({
+        message: 'This plan already holds as many vendors as Utsav keeps. Remove one first.',
+        fields: [],
+      });
+      return;
+    }
     if (category.trim() === '') {
       setError({
         message: 'Say which kind of vendor, for example "Live band".',

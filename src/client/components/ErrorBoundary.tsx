@@ -17,8 +17,9 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
     this.announceFailure();
   }
 
-  override componentDidUpdate() {
-    this.announceFailure();
+  override componentDidUpdate(_props: unknown, previous: { failed: boolean }) {
+    // Only when it first fails: later re-renders must not pull focus back.
+    if (!previous.failed) this.announceFailure();
   }
 
   /** Like every other view: a title of its own, and keyboard focus on the heading. */

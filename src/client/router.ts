@@ -81,6 +81,8 @@ export function useRoute(): Route {
       });
     };
     window.addEventListener('hashchange', onChange);
+    // Catch a change made between the first render and this listener being added.
+    onChange();
     return () => {
       window.removeEventListener('hashchange', onChange);
     };

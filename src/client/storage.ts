@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { LIMITS } from '../shared/limits.js';
 import type { Plan } from '../shared/schemas.js';
 import { PlanSchema } from '../shared/schemas.js';
-import { PLANS_KEY, readJson, writeJson } from './browserStorage';
+import { PLANS_KEY, readJson } from './browserStorage';
 
 export { PLANS_KEY };
 
@@ -19,11 +19,6 @@ export function readPlans(): Plan[] {
     .filter((result) => result.success)
     .map((result) => result.data)
     .sort(newestFirst);
-}
-
-/** Save every plan; false when the browser refused. */
-export function writePlans(plans: readonly Plan[]): boolean {
-  return writeJson(PLANS_KEY, plans);
 }
 
 export type ImportResult = { ok: true; plans: Plan[] } | { ok: false; message: string };

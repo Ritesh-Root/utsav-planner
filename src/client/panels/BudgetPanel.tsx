@@ -7,6 +7,7 @@ import { formatMoney, parseWholeNumber } from '../../shared/money.js';
 import {
   addBudgetLine,
   applyGuestChange,
+  planIsFull,
   randomId,
   removeBudgetLine,
   setLineActual,
@@ -107,6 +108,13 @@ function AddLineForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   const [error, setError] = useState<FormError | null>(null);
 
   const submit = () => {
+    if (planIsFull(plan, 'budget')) {
+      setError({
+        message: 'This plan already holds as many budget lines as Utsav keeps. Remove one first.',
+        fields: [],
+      });
+      return;
+    }
     const value = parseWholeNumber(amount);
     const badAmount = value === null || value > LIMITS.budgetMax;
     if (category.trim() === '' || badAmount) {

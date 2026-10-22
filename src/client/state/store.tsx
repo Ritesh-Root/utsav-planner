@@ -11,7 +11,7 @@ import {
 
 import { LIMITS } from '../../shared/limits.js';
 import type { Plan } from '../../shared/schemas.js';
-import { PLANS_KEY, writeJson } from '../browserStorage';
+import { PLANS_KEY, writePlans } from '../browserStorage';
 import { useAnnounce } from './announcer';
 
 export interface StoreState {
@@ -83,6 +83,11 @@ const StoreContext = createContext<PlanStore | null>(null);
 /** How long to wait after the last edit before writing to localStorage. */
 const SAVE_DELAY_MS = 300;
 
+/** Same plans in the same order (the objects themselves, not copies). */
+function sameList(a: readonly Plan[], b: readonly Plan[]): boolean {
+  return a.length === b.length && a.every((plan, i) => plan === b[i]);
+}
+
 /** Reading saved plans needs zod; load it after the first screen has painted. */
 const loadSavedPlans = () => import('../storage').then((storage) => storage.readPlans());
 
@@ -101,9 +106,12 @@ export function PlanStoreProvider({
     ready: initialPlans !== undefined,
   }));
 
+  // What storage held when this tab started: the list that needs no writing back.
+  const baseline = useRef<Plan[] | null>(initialPlans ?? null);
   useEffect(() => {
     if (initialPlans !== undefined) return;
     void loadSavedPlans().then((plans) => {
+      baseline.current = plans;
       dispatch({ type: 'loaded', plans });
     });
   }, [initialPlans]);
@@ -117,7 +125,7 @@ export function PlanStoreProvider({
     if (!plans) return;
     pending.current = null;
     lastWritten.current = plans;
-    if (!writeJson(PLANS_KEY, plans)) {
+    if (!writePlans(plans)) {
       announce(
         'Utsav couldn’t save in this browser. Download your plans from Settings to keep a copy.',
         'assertive',
@@ -125,14 +133,19 @@ export function PlanStoreProvider({
     }
   }, [announce]);
 
-  const loadedPlans = useRef<Plan[] | null>(null);
+  const started = useRef(false);
   useEffect(() => {
     if (!state.ready) return undefined;
-    if (loadedPlans.current === null) {
-      loadedPlans.current = state.plans;
+    if (!started.current) {
+      started.current = true;
+      // Skip the write only when nothing was made or imported while saved plans loaded.
+      const saved = baseline.current;
+      if (saved && sameList(state.plans, saved)) return undefined;
+    }
+    if (state.plans === lastWritten.current) {
+      pending.current = null;
       return undefined;
     }
-    if (state.plans === lastWritten.current) return undefined;
     pending.current = state.plans;
     const timer = window.setTimeout(flush, SAVE_DELAY_MS);
     return () => {
@@ -159,6 +172,8 @@ export function PlanStoreProvider({
     const onStorage = (event: StorageEvent) => {
       if (event.key !== PLANS_KEY) return;
       void loadSavedPlans().then((plans) => {
+        // The other tab's list is now the newest: drop any write this tab still had queued.
+        pending.current = null;
         lastWritten.current = plans;
         dispatch({ type: 'replace-all', plans });
       });

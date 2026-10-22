@@ -23,6 +23,7 @@ export {
   removeBudgetLine,
   addDayOfItem,
   removeDayOfItem,
+  planIsFull,
 } from './plan/edits.js';
 export { toRefineContext, mergeRefinement } from './plan/refine.js';
 export { diffPlans, describeDiff } from './plan/diff.js';

@@ -4,6 +4,8 @@
  * windows, policies); nothing here ever throws.
  */
 
+import type { Plan } from '../shared/schemas.js';
+
 export const PLANS_KEY = 'utsav:v1:plans';
 
 function storage(): Storage | null {
@@ -34,4 +36,9 @@ export function writeJson(key: string, value: unknown): boolean {
   } catch {
     return false;
   }
+}
+
+/** Save every plan; false when the browser refused. */
+export function writePlans(plans: readonly Plan[]): boolean {
+  return writeJson(PLANS_KEY, plans);
 }

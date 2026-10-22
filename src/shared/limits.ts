@@ -32,6 +32,12 @@ export const LIMITS = {
   ideasMax: 10,
   dayOfMax: 14,
   dayOfMin: 1,
+  /** Most items a stored plan holds, counting the user's own additions to what Gemini drafted. */
+  planBudgetLinesMax: 16,
+  planTasksMax: 72,
+  planVendorsMax: 24,
+  planIdeasMax: 40,
+  planDayOfMax: 28,
   assumptionsMax: 5,
 
   /** Lead times the AI may use, in days before the event (negative = after it). */

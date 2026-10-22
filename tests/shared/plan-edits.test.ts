@@ -8,6 +8,7 @@ import {
   applyBriefChange,
   applyGuestChange,
   mergeRefinement,
+  planIsFull,
   removeBudgetLine,
   removeDayOfItem,
   removeTask,
@@ -20,6 +21,7 @@ import {
 } from '../../src/shared/plan.js';
 import type { Plan } from '../../src/shared/schemas.js';
 import { PlanSchema } from '../../src/shared/schemas.js';
+import { LIMITS } from '../../src/shared/limits.js';
 import {
   NOW,
   TODAY,
@@ -235,5 +237,61 @@ describe('refinement merges keep the user’s work', () => {
     expect(merged.dayOf.map((d) => d.title)).toEqual(['First', 'Second', 'Late', 'Clamped']);
     expect(merged.dayOf.at(-1)?.day).toBe(3);
     expect(PlanSchema.safeParse(merged).success).toBe(true);
+  });
+});
+
+describe('plans never outgrow what storage accepts', () => {
+  const ids = () => sequentialIds('cap');
+
+  it('refuses to add to a full section, leaving the plan as it was', () => {
+    let plan = templatePlan(birthdayBrief);
+    while (!planIsFull(plan, 'budget')) {
+      plan = addBudgetLine(
+        plan,
+        { category: `Line ${plan.budget.length}`, amount: 10 },
+        ids(),
+        NOW,
+      );
+    }
+    expect(plan.budget).toHaveLength(LIMITS.planBudgetLinesMax);
+    expect(addBudgetLine(plan, { category: 'One more', amount: 10 }, ids(), NOW)).toBe(plan);
+    expect(PlanSchema.safeParse(plan).success).toBe(true);
+  });
+
+  it('keeps every saved idea and only as many new ones as fit when refining a full plan', () => {
+    let plan = templatePlan(birthdayBrief);
+    while (!planIsFull(plan, 'ideas')) {
+      plan = addCustomIdea(
+        plan,
+        { title: `Mine ${plan.ideas.length}`, description: '', category: 'theme' },
+        ids(),
+        NOW,
+      );
+    }
+    const fresh = Array.from({ length: 6 }, (_, i) => ({
+      title: `Gemini idea ${i}`,
+      description: 'd',
+      category: 'decor' as const,
+      costTier: 'low' as const,
+    }));
+    const merged = mergeRefinement(
+      plan,
+      { message: 'm', briefPatch: null, sections: { ideas: fresh } },
+      { today: TODAY, now: NOW, newId: ids() },
+    );
+    expect(merged.ideas.length).toBeLessThanOrEqual(LIMITS.planIdeasMax);
+    expect(merged.ideas.filter((idea) => idea.saved)).toHaveLength(
+      plan.ideas.filter((i) => i.saved).length,
+    );
+    expect(PlanSchema.safeParse(merged).success).toBe(true);
+  });
+
+  it('gives an added line a fair share, so Reset does not empty it', () => {
+    const plan = templatePlan(birthdayBrief);
+    const added = addBudgetLine(plan, { category: 'Photo booth', amount: 5000 }, ids(), NOW);
+    const line = added.budget.at(-1);
+    if (!line) throw new Error('fixture');
+    const reset = unlockLine(added, line.id, NOW);
+    expect(reset.budget.find((l) => l.id === line.id)?.amount).toBeGreaterThan(2500);
   });
 });

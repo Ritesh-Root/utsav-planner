@@ -120,7 +120,7 @@ locally) authenticate to Vertex AI.
 
 ### Testing
 
-- **236 tests** (Vitest) in a node project (shared domain, server, styles) and a jsdom project (client),
+- **244 tests** (Vitest) in a node project (shared domain, server, styles) and a jsdom project (client),
   hermetic: no network, no credentials, no build step, any time zone. CI also runs them on Node 22, 24 and
   26 in three time zones.
 - Highlights: a 500-case property test that budgets always add up, and a 300-run one that they still do

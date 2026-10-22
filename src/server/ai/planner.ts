@@ -55,7 +55,11 @@ const FALLBACK_REASONS = {
 } as const;
 type FallbackKind = keyof typeof FALLBACK_REASONS;
 
-/** Failures that mean the model service itself is struggling. */
+/**
+ * Failures that would hit every user, so they open the breaker: the service struggling
+ * (timeouts, 429, 5xx, network) or rejecting our fixed setup ('client': a 4xx caused by
+ * the schema, model name or credentials, since user input is bounded before it is sent).
+ */
 const SERVICE_FAULTS: ReadonlySet<AiErrorKind> = new Set([
   'timeout',
   'rate-limit',
@@ -185,8 +189,8 @@ export function createPlanner(deps: PlannerDeps): Planner {
       } catch (error) {
         const retryable =
           error instanceof InvalidOutputError || (error instanceof AiError && error.retryable);
-        // Only faults of the AI service open the breaker. An answer that could not be
-        // used is shaped by the request itself, so one user cannot trip it for everyone.
+        // Only failures that would hit every user open the breaker. An answer that could
+        // not be used is shaped by one request, so one user cannot trip it for everyone.
         if (error instanceof AiError && SERVICE_FAULTS.has(error.kind)) breaker.recordFailure();
         logger.warn('ai call failed', {
           route: label,

@@ -44,7 +44,7 @@ export function EditDetailsDialog({
     <Dialog open onClose={onClose} title="Edit event details">
       <p className="hint">
         A new date moves every open task. A new budget or guest count re-splits the lines you have
-        not set yourself.
+        not set yourself. The kind of event and its currency stay as they are.
       </p>
       <BriefForm
         draft={draft}
@@ -52,7 +52,7 @@ export function EditDetailsDialog({
         onChange={setDraft}
         onSubmit={save}
         submitLabel="Save details"
-        hideType
+        editing
         onCancel={onClose}
       />
     </Dialog>

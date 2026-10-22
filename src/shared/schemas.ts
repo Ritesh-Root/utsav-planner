@@ -278,11 +278,11 @@ export const PlanSchema = z.strictObject({
   title: storedText(LIMITS.shortText),
   summary: storedText(LIMITS.longText),
   assumptions: z.array(storedText(LIMITS.mediumText)).max(LIMITS.assumptionsMax),
-  budget: z.array(BudgetLineSchema).max(LIMITS.budgetLinesMax + 4),
-  tasks: z.array(TaskSchema).max(LIMITS.tasksMax * 3),
-  vendors: z.array(VendorSchema).max(LIMITS.vendorsMax * 2),
-  ideas: z.array(IdeaSchema).max(LIMITS.ideasMax * 4),
-  dayOf: z.array(DayOfItemSchema).max(LIMITS.dayOfMax * 2),
+  budget: z.array(BudgetLineSchema).max(LIMITS.planBudgetLinesMax),
+  tasks: z.array(TaskSchema).max(LIMITS.planTasksMax),
+  vendors: z.array(VendorSchema).max(LIMITS.planVendorsMax),
+  ideas: z.array(IdeaSchema).max(LIMITS.planIdeasMax),
+  dayOf: z.array(DayOfItemSchema).max(LIMITS.planDayOfMax),
 });
 export type Plan = z.infer<typeof PlanSchema>;
 export type BudgetLine = z.infer<typeof BudgetLineSchema>;
@@ -317,7 +317,7 @@ const RefineContextSchema = z.strictObject({
         locked: z.boolean(),
       }),
     )
-    .max(LIMITS.budgetLinesMax + 4),
+    .max(LIMITS.planBudgetLinesMax),
   timeline: z
     .array(
       z.strictObject({
@@ -328,7 +328,7 @@ const RefineContextSchema = z.strictObject({
         done: z.boolean(),
       }),
     )
-    .max(LIMITS.tasksMax * 3),
+    .max(LIMITS.planTasksMax),
   vendors: z
     .array(
       z.strictObject({
@@ -339,7 +339,7 @@ const RefineContextSchema = z.strictObject({
         status: z.enum(VENDOR_STATUSES),
       }),
     )
-    .max(LIMITS.vendorsMax * 2),
+    .max(LIMITS.planVendorsMax),
   ideas: z
     .array(
       z.strictObject({
@@ -349,7 +349,7 @@ const RefineContextSchema = z.strictObject({
         saved: z.boolean(),
       }),
     )
-    .max(LIMITS.ideasMax * 4),
+    .max(LIMITS.planIdeasMax),
   dayOf: z
     .array(
       z.strictObject({
@@ -359,7 +359,7 @@ const RefineContextSchema = z.strictObject({
         title: contextText,
       }),
     )
-    .max(LIMITS.dayOfMax * 2),
+    .max(LIMITS.planDayOfMax),
 });
 export type RefineContext = z.infer<typeof RefineContextSchema>;
 

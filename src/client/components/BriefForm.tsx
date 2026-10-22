@@ -108,7 +108,7 @@ export function BriefForm({
   onSubmit,
   submitLabel,
   busy = false,
-  hideType = false,
+  editing = false,
   onCancel,
 }: {
   draft: BriefDraft;
@@ -117,8 +117,11 @@ export function BriefForm({
   onSubmit: () => void;
   submitLabel: string;
   busy?: boolean;
-  /** The type of an existing plan cannot change. */
-  hideType?: boolean;
+  /**
+   * Editing an existing plan: its type and currency stay fixed, since amounts already
+   * typed in that currency would otherwise be read as another one.
+   */
+  editing?: boolean;
   /** Shows a Cancel button instead of the link back home. */
   onCancel?: () => void;
 }) {
@@ -135,7 +138,7 @@ export function BriefForm({
     <form className="form" noValidate onSubmit={handleSubmit} aria-busy={busy}>
       <ErrorSummary errors={errors} />
 
-      <fieldset hidden={hideType} aria-describedby={errors.type ? errorId('type') : undefined}>
+      <fieldset hidden={editing} aria-describedby={errors.type ? errorId('type') : undefined}>
         <legend>{FIELD_LABELS.type}</legend>
         <div className="choices">
           {EVENT_TYPES.map((type: EventType) => (
@@ -218,22 +221,24 @@ export function BriefForm({
             }}
           />
         </Field>
-        <Field field="currency" error={errors.currency}>
-          <select
-            className="select"
-            {...describe('currency', errors)}
-            value={draft.currency}
-            onChange={(e) => {
-              set('currency', e.target.value as BriefDraft['currency']);
-            }}
-          >
-            {CURRENCIES.map((currency) => (
-              <option key={currency} value={currency}>
-                {currency}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {!editing && (
+          <Field field="currency" error={errors.currency}>
+            <select
+              className="select"
+              {...describe('currency', errors)}
+              value={draft.currency}
+              onChange={(e) => {
+                set('currency', e.target.value as BriefDraft['currency']);
+              }}
+            >
+              {CURRENCIES.map((currency) => (
+                <option key={currency} value={currency}>
+                  {currency}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
       </div>
 
       <div className="field-row">

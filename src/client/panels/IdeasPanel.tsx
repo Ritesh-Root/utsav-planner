@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 
 import { IDEA_CATEGORIES } from '../../shared/constants.js';
 import { LIMITS } from '../../shared/limits.js';
-import { addCustomIdea, randomId, toggleIdeaSaved } from '../../shared/plan.js';
+import { addCustomIdea, planIsFull, randomId, toggleIdeaSaved } from '../../shared/plan.js';
 import type { IdeaCategory } from '../../shared/schemas.js';
 import type { FormError } from '../components/InlineForm';
 import { FormField, InlineForm } from '../components/InlineForm';
@@ -18,6 +18,13 @@ function AddIdeaForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   const [error, setError] = useState<FormError | null>(null);
 
   const submit = () => {
+    if (planIsFull(plan, 'ideas')) {
+      setError({
+        message: 'This plan already holds as many ideas as Utsav keeps. Remove one first.',
+        fields: [],
+      });
+      return;
+    }
     if (title.trim() === '') {
       setError({ message: 'Give your idea a short name.', fields: ['name'] });
       return;

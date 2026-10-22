@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +6,8 @@ import { App } from '../../src/client/App';
 import { ErrorBoundary } from '../../src/client/components/ErrorBoundary';
 import { requestPlan } from '../../src/client/api';
 import { PLANS_KEY } from '../../src/client/storage';
+import { usePlanStore } from '../../src/client/state/store';
+import { useEffect } from 'react';
 import HomeView from '../../src/client/views/HomeView';
 import NewPlanView from '../../src/client/views/NewPlanView';
 import PlanView from '../../src/client/views/PlanView';
@@ -469,5 +471,86 @@ describe('keyboard focus after changes', () => {
     expect(document.querySelector('.main')).toHaveAttribute('inert');
     await user.keyboard('{Escape}');
     expect(document.querySelector('.main')).not.toHaveAttribute('inert');
+  });
+});
+
+describe('saving never loses a plan', () => {
+  it('writes a plan made before the saved ones finished loading', async () => {
+    const saved = templatePlan(birthdayBrief);
+    localStorage.setItem(PLANS_KEY, JSON.stringify([saved]));
+    const early = { ...planFor(), id: 'plan-early' };
+    function MakesAPlanAtOnce() {
+      const { savePlan } = usePlanStore();
+      useEffect(() => {
+        savePlan(early);
+      }, [savePlan]);
+      return null;
+    }
+    renderWithProviders(<MakesAPlanAtOnce />, null);
+    await waitFor(
+      () => {
+        const stored = JSON.parse(localStorage.getItem(PLANS_KEY) ?? '[]') as Plan[];
+        expect(stored.map((p) => p.id).sort()).toEqual([early.id, saved.id].sort());
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it('does not write over another tab’s newer save when this page is hidden', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PlanView id="plan-1" tab="overview" />, [planFor()]);
+    await user.click(screen.getAllByRole('checkbox')[0]!);
+    const otherTab = [{ ...templatePlan(birthdayBrief), id: 'plan-other' }];
+    localStorage.setItem(PLANS_KEY, JSON.stringify(otherTab));
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: PLANS_KEY }));
+    });
+    await waitFor(() => {
+      expect(document.title).toContain('Plan not found');
+    });
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    const stored = JSON.parse(localStorage.getItem(PLANS_KEY) ?? '[]') as Plan[];
+    expect(stored.map((p) => p.id)).toEqual(otherTab.map((p) => p.id));
+  });
+
+  it('keeps both plans when one backup file holds the same id twice', async () => {
+    const user = userEvent.setup();
+    const plan = templatePlan(birthdayBrief);
+    renderWithProviders(<SettingsView />, []);
+    await user.upload(
+      screen.getByLabelText('Open a plan file'),
+      new File([JSON.stringify([plan, plan])], 'plans.json', { type: 'application/json' }),
+    );
+    expect(await screen.findByText(/2 plans are saved/)).toBeInTheDocument();
+  });
+
+  it('never offers a currency change for an existing plan', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PlanView id="plan-1" tab="overview" />, [planFor()]);
+    await user.click(screen.getByRole('button', { name: 'Edit details' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit event details' });
+    expect(within(dialog).queryByLabelText(/currency/i)).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Number of guests')).toBeInTheDocument();
+  });
+
+  it('leaves focus alone when the error page re-renders', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const Broken = () => {
+      throw new Error('boom');
+    };
+    const ui = (n: number) => (
+      <>
+        <button type="button">Other {n}</button>
+        <ErrorBoundary>
+          <Broken />
+        </ErrorBoundary>
+      </>
+    );
+    const { rerender } = render(ui(1));
+    screen.getByRole('button', { name: 'Reload' }).focus();
+    rerender(ui(2));
+    expect(screen.getByRole('button', { name: 'Reload' })).toHaveFocus();
   });
 });

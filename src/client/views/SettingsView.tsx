@@ -39,9 +39,13 @@ export default function SettingsView() {
       announce(result.message, 'assertive');
       return;
     }
-    // Never overwrite an existing plan by accident: an id clash gets a new id.
+    // Never overwrite a plan by accident: an id already saved, or seen earlier in this
+    // file, gets a new one.
+    const taken = new Set(store.plans.map((p) => p.id));
     for (const plan of result.plans) {
-      store.savePlan(store.getPlan(plan.id) ? { ...plan, id: randomId('plan') } : plan);
+      const id = taken.has(plan.id) ? randomId('plan') : plan.id;
+      taken.add(id);
+      store.savePlan({ ...plan, id });
     }
     const [first] = result.plans;
     const text =

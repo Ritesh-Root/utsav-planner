@@ -12,7 +12,7 @@ import type {
 } from '../schemas.js';
 import { projectGuests, toBasisPoints } from '../budget.js';
 import { clampStartMinute, diffDays } from '../dates.js';
-import { LIMITS } from '../limits.js';
+import { BASIS_POINTS, LIMITS } from '../limits.js';
 import { toWholeAmount } from '../money.js';
 import { clampBookDays, clampDay, clampDaysBefore, schedule, sortTasks } from '../timeline.js';
 import { truncate } from '../sanitize.js';
@@ -108,6 +108,20 @@ export function applyGuestChange(
   });
 }
 
+/** The most each section of a plan can hold (see LIMITS), so a stored plan always stays valid. */
+const SECTION_MAX = {
+  budget: LIMITS.planBudgetLinesMax,
+  tasks: LIMITS.planTasksMax,
+  vendors: LIMITS.planVendorsMax,
+  ideas: LIMITS.planIdeasMax,
+  dayOf: LIMITS.planDayOfMax,
+} as const;
+
+/** True when a section has no room for another item; the add helpers then change nothing. */
+export function planIsFull(plan: Plan, section: keyof typeof SECTION_MAX): boolean {
+  return plan[section].length >= SECTION_MAX[section];
+}
+
 /** Add the user's own task, scheduled relative to the event date. */
 export function addCustomTask(
   plan: Plan,
@@ -115,6 +129,7 @@ export function addCustomTask(
   newId: IdFactory,
   now: Date,
 ): Plan {
+  if (planIsFull(plan, 'tasks')) return plan;
   const daysBefore = clampDaysBefore(diffDays(input.due, plan.brief.date));
   const task: Task = {
     id: newId('task'),
@@ -168,6 +183,7 @@ export function addCustomVendor(
   today: string,
   now: Date,
 ): Plan {
+  if (planIsFull(plan, 'vendors')) return plan;
   const bookDaysBefore = clampBookDays(diffDays(input.bookBy, plan.brief.date));
   const vendor: Vendor = {
     id: newId('vendor'),
@@ -205,6 +221,7 @@ export function addCustomIdea(
   newId: IdFactory,
   now: Date,
 ): Plan {
+  if (planIsFull(plan, 'ideas')) return plan;
   const idea: Idea = {
     id: newId('idea'),
     category: input.category,
@@ -226,11 +243,16 @@ export function addBudgetLine(
   newId: IdFactory,
   now: Date,
 ): Plan {
+  if (planIsFull(plan, 'budget')) return plan;
   const line: BudgetLine = {
     id: newId('budget'),
     key: 'misc',
     category: truncate(input.category.trim(), LIMITS.shortText),
-    shareBp: 0,
+    // A share matching its amount, so "Reset" later gives it a fair slice rather than nothing.
+    shareBp:
+      plan.brief.budget > 0
+        ? Math.min(BASIS_POINTS, Math.round((input.amount / plan.brief.budget) * BASIS_POINTS))
+        : 0,
     perGuest: false,
     rationale: 'Added by you.',
     estLow: 0,
@@ -260,6 +282,7 @@ export function addDayOfItem(
   newId: IdFactory,
   now: Date,
 ): Plan {
+  if (planIsFull(plan, 'dayOf')) return plan;
   const item: DayOfItem = {
     id: newId('day'),
     day: clampDay(input.day, plan.brief.days),
