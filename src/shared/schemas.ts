@@ -186,7 +186,6 @@ export const AiRefineSchema = AiRefineSectionsSchema.extend({
     .optional()
     .meta({ description: 'Only fields the user explicitly asked to change' }),
 });
-export type AiRefine = z.infer<typeof AiRefineSchema>;
 
 // ---------------------------------------------------------------------------
 // The stored plan. Validated on load and on import, so a corrupted or edited
@@ -292,7 +291,6 @@ export const PlanRequestSchema = z.strictObject({
   brief: BriefSchema,
   today: IsoDateSchema,
 });
-export type PlanRequest = z.infer<typeof PlanRequestSchema>;
 
 const contextText = z.string().max(LIMITS.shortText);
 

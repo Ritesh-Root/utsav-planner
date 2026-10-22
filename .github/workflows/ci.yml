@@ -49,6 +49,26 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
 
+  e2e:
+    name: Browser and accessibility check (Playwright + axe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npx playwright-core install --with-deps chromium
+      - name: Run the app with AI off and check every screen
+        run: |
+          AI_MODE=off PORT=8080 node dist/node/server/main.js &
+          for attempt in $(seq 1 30); do curl -sf http://localhost:8080/api/health > /dev/null && break; sleep 1; done
+          npm run test:e2e -- http://localhost:8080
+
   secrets:
     name: No secrets in history
     runs-on: ubuntu-latest

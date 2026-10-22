@@ -72,7 +72,6 @@ export type VendorStatus = (typeof VENDOR_STATUSES)[number];
 export type IdeaCategory = (typeof IDEA_CATEGORIES)[number];
 export type CostTier = (typeof COST_TIERS)[number];
 export type RefineScope = (typeof REFINE_SCOPES)[number];
-export type PlanSection = Exclude<RefineScope, 'all'>;
 
 /** Stored plans carry this version so future formats can be migrated. */
 export const PLAN_VERSION = 1;

@@ -81,7 +81,8 @@ locally) authenticate to Vertex AI.
 ### Code quality
 
 - TypeScript 6 in strict mode with `noUncheckedIndexedAccess`; ESLint 9 with typescript-eslint
-  `strictTypeChecked`, React Hooks and jsx-a11y `strict`, run with `--max-warnings=0`; Prettier.
+  `strictTypeChecked`, React Hooks and jsx-a11y `strict`, run with `--max-warnings=0`; Prettier; knip
+  fails the build on unused files, exports and dependencies.
 - Pure, documented domain functions with `today` passed in; side effects only at the edges. The server is
   built by `createApp(deps)` so tests inject a fake model.
 - Every bound lives in `src/shared/limits.ts` and feeds validation, prompts and form `maxLength` alike.
@@ -130,7 +131,8 @@ locally) authenticate to Vertex AI.
 - Coverage gate: 90% of lines and 84% of branches overall, higher for shared and server code (currently
   95% and 86%).
 - Outside `npm test`: `npm run smoke:ai` (live Gemini), `npm run smoke:live -- <url>` and
-  `npm run test:e2e -- <url>` (Playwright + axe in four display modes).
+  `npm run test:e2e -- <url>` (Playwright + axe in four display modes; run `npm run test:e2e:install` once
+  to download Chromium). CI runs the browser check against a fresh build on every push.
 
 ### Accessibility
 

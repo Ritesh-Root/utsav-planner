@@ -14,6 +14,7 @@
     "build": "vite build && node scripts/precompress.mjs && tsc -p tsconfig.build.json",
     "start": "node dist/node/server/main.js",
     "lint": "eslint . --max-warnings=0",
+    "lint:unused": "knip",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json",
@@ -24,7 +25,7 @@
     "smoke:ai": "tsx scripts/smoke-ai.ts",
     "smoke:live": "node scripts/smoke-live.mjs",
     "budget:bundle": "node scripts/bundle-budget.mjs",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test:coverage && npm run build && npm run budget:bundle"
+    "check": "npm run lint && npm run lint:unused && npm run format:check && npm run typecheck && npm run test:coverage && npm run build && npm run budget:bundle"
   },
   "dependencies": {
     "@google/genai": "2.30.0",
@@ -56,6 +57,7 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.13.0",
     "jsdom": "30.1.3",
+    "knip": "6.42.1",
     "playwright-core": "1.64.1",
     "prettier": "3.9.10",
     "react": "19.3.1",
