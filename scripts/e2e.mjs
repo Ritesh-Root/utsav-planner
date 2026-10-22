@@ -90,20 +90,20 @@ function check(label, ok, detail = '') {
       .evaluateAll((inputs) => inputs.map((input) => Number(input.value.replace(/,/g, ''))));
     return values.reduce((sum, value) => sum + value, 0);
   };
-  check(
-    'budget lines add up to the budget',
-    (await planned()) === budget,
-    `${await planned()} vs ${budget}`,
-  );
+  // Inputs show new amounts a render after the change, so give them a moment to settle.
+  const addsUp = async () => {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      if ((await planned()) === budget) return true;
+      await page.waitForTimeout(100);
+    }
+    return false;
+  };
+  check('budget lines add up to the budget', await addsUp(), `${await planned()} vs ${budget}`);
   const first = page.getByRole('textbox', { name: /^Planned for / }).first();
   await first.fill('5000');
   await first.press('Enter');
   await page.getByText('Set by you').first().waitFor();
-  check(
-    'still adds up after locking a line',
-    (await planned()) === budget,
-    `${await planned()} vs ${budget}`,
-  );
+  check('still adds up after locking a line', await addsUp(), `${await planned()} vs ${budget}`);
   await page.getByRole('tab', { name: 'Timeline' }).click();
   const task = page.getByRole('checkbox').first();
   const taskName = await task.evaluate((input) => input.labels?.[0]?.textContent ?? '');
