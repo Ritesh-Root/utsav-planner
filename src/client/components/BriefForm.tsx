@@ -4,16 +4,16 @@ import { useEffect, useRef } from 'react';
 import { LIMITS } from '../../shared/limits.js';
 import { CURRENCIES } from '../../shared/money.js';
 import type { Dietary, EventType, Priority, VenuePreference } from '../../shared/schemas.js';
-import { DIETARY, EVENT_TYPES, PRIORITIES, VENUE_PREFERENCES } from '../../shared/schemas.js';
-import type { BriefDraft, BriefField, FieldErrors } from '../briefForm';
-import { FIELD_LABELS, FIELD_ORDER } from '../briefForm';
+import { DIETARY, EVENT_TYPES, PRIORITIES, VENUE_PREFERENCES } from '../../shared/constants.js';
+import type { BriefDraft, BriefField, FieldErrors } from '../briefDraft';
+import { FIELD_LABELS, FIELD_ORDER } from '../briefDraft';
 import { DIETARY_LABELS, EVENT_TYPE_LABELS, PRIORITY_LABELS, VENUE_LABELS } from '../labels';
 
 const fieldId = (field: BriefField) => `brief-${field}`;
 const errorId = (field: BriefField) => `brief-${field}-error`;
 
 /** GOV.UK-style summary: focused when shown, each error links to its field. */
-export function ErrorSummary({ errors }: { errors: FieldErrors }) {
+function ErrorSummary({ errors }: { errors: FieldErrors }) {
   const ref = useRef<HTMLDivElement>(null);
   const fields = FIELD_ORDER.filter((field) => errors[field]);
   useEffect(() => {
@@ -21,7 +21,13 @@ export function ErrorSummary({ errors }: { errors: FieldErrors }) {
   }, [errors]);
   if (fields.length === 0) return null;
   return (
-    <div ref={ref} className="error-summary" tabIndex={-1} aria-labelledby="error-summary-title">
+    <div
+      ref={ref}
+      className="error-summary"
+      role="group"
+      tabIndex={-1}
+      aria-labelledby="error-summary-title"
+    >
       <h2 id="error-summary-title">
         There {fields.length === 1 ? 'is a problem' : 'are some problems'}
       </h2>
@@ -91,6 +97,10 @@ function toggle<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
+/**
+ * Every detail of an event, with inline errors and a summary. Used to create a
+ * plan and, with the type hidden, to edit one.
+ */
 export function BriefForm({
   draft,
   errors,
@@ -98,6 +108,8 @@ export function BriefForm({
   onSubmit,
   submitLabel,
   busy = false,
+  hideType = false,
+  onCancel,
 }: {
   draft: BriefDraft;
   errors: FieldErrors;
@@ -105,6 +117,10 @@ export function BriefForm({
   onSubmit: () => void;
   submitLabel: string;
   busy?: boolean;
+  /** The type of an existing plan cannot change. */
+  hideType?: boolean;
+  /** Shows a Cancel button instead of the link back home. */
+  onCancel?: () => void;
 }) {
   const set = <K extends BriefField>(field: K, value: BriefDraft[K]) => {
     onChange({ ...draft, [field]: value });
@@ -119,7 +135,7 @@ export function BriefForm({
     <form className="form" noValidate onSubmit={handleSubmit} aria-busy={busy}>
       <ErrorSummary errors={errors} />
 
-      <fieldset aria-describedby={errors.type ? errorId('type') : undefined}>
+      <fieldset hidden={hideType} aria-describedby={errors.type ? errorId('type') : undefined}>
         <legend>{FIELD_LABELS.type}</legend>
         <div className="choices">
           {EVENT_TYPES.map((type: EventType) => (
@@ -298,6 +314,8 @@ export function BriefForm({
               <label key={priority} className="choice">
                 <input
                   type="checkbox"
+                  name="priorities"
+                  value={priority}
                   checked={checked}
                   disabled={!checked && tooManyPriorities}
                   onChange={() => {
@@ -318,6 +336,8 @@ export function BriefForm({
             <label key={need} className="choice">
               <input
                 type="checkbox"
+                name="dietary"
+                value={need}
                 checked={draft.dietary.includes(need)}
                 onChange={() => {
                   set('dietary', toggle(draft.dietary, need));
@@ -349,9 +369,15 @@ export function BriefForm({
         <button type="submit" className="btn btn-primary" disabled={busy}>
           {submitLabel}
         </button>
-        <a className="btn btn-quiet" href="#/">
-          Cancel
-        </a>
+        {onCancel ? (
+          <button type="button" className="btn btn-quiet" onClick={onCancel}>
+            Cancel
+          </button>
+        ) : (
+          <a className="btn btn-quiet" href="#/">
+            Cancel
+          </a>
+        )}
       </div>
     </form>
   );

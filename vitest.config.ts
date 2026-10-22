@@ -34,9 +34,10 @@ export default defineConfig({
       exclude: ['src/client/main.tsx', 'src/server/main.ts'],
       reporter: ['text-summary', 'text', 'html'],
       thresholds: {
-        lines: 85,
-        branches: 80,
-        'src/shared/**': { lines: 95 },
+        lines: 90,
+        branches: 84,
+        'src/shared/**': { lines: 98, branches: 90 },
+        'src/server/**': { lines: 95, branches: 88 },
       },
     },
   },

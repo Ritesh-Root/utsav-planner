@@ -45,7 +45,7 @@ export interface ShareLine {
 export function withContingency(lines: readonly ShareLine[]): { keys: string[]; bp: number[] } {
   const minBp = LIMITS.contingencyMinPct * 100;
   const maxBp = LIMITS.contingencyMaxPct * 100;
-  const defaultBp = 800;
+  const defaultBp = LIMITS.contingencyDefaultPct * 100;
 
   const keys = lines.map((line) => line.key);
   let index = keys.indexOf('contingency');
@@ -117,6 +117,7 @@ export interface BudgetSummary {
   percents: number[];
 }
 
+/** Totals for the budget panel: planned, spent, remaining, overspend and per-guest cost. */
 export function summarizeBudget(
   lines: readonly { amount: number; actual: number }[],
   total: number,

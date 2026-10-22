@@ -8,6 +8,12 @@ import {
   toBasisPoints,
   withContingency,
 } from '../../src/shared/budget.js';
+import {
+  estimateCap,
+  formatMoney,
+  parseWholeNumber,
+  toWholeAmount,
+} from '../../src/shared/money.js';
 
 const sum = (values: number[]) => values.reduce((acc, v) => acc + v, 0);
 
@@ -166,5 +172,26 @@ describe('projectGuests', () => {
     expect(projection.projectedTotal).toBe(105_000);
     expect(projection.difference).toBe(25_000);
     expect(projectGuests([{ amount: 10, perGuest: true }], 0, 5, 10).amounts).toEqual([10]);
+  });
+});
+
+describe('money helpers', () => {
+  it('parses whole numbers people type, forgiving separators', () => {
+    expect(parseWholeNumber('2,50,000')).toBe(250_000);
+    expect(parseWholeNumber(' 25 000 ')).toBe(25_000);
+    expect(parseWholeNumber('1_000')).toBe(1000);
+    expect(parseWholeNumber('12.5')).toBeNull();
+    expect(parseWholeNumber('-3')).toBeNull();
+    expect(parseWholeNumber('')).toBeNull();
+    expect(parseWholeNumber('lots')).toBeNull();
+  });
+
+  it('caps AI estimates at three times the budget and rounds amounts', () => {
+    expect(estimateCap(25_000)).toBe(75_000);
+    expect(toWholeAmount(12.6)).toBe(13);
+    expect(toWholeAmount(-4)).toBe(0);
+    expect(toWholeAmount(Number.NaN)).toBe(0);
+    expect(toWholeAmount(500, 100)).toBe(100);
+    expect(formatMoney(250_000, 'INR')).toBe('₹2,50,000');
   });
 });

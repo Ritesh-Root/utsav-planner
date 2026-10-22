@@ -17,12 +17,13 @@ const ai =
         model: config.ai.model,
       })
     : null;
-if (!ai) logger.warn('AI is off: plans will come from templates');
+if (!ai) logger.warn('AI is off: plans will come from templates', { reason: config.aiOffReason });
 
 const app = createApp({
   planner: createPlanner({ ai, logger, dailyCap: config.dailyAiCap }),
   logger,
   version: config.version,
+  trustProxy: config.trustProxy,
   // dist/node/server/main.js → dist/client
   staticDir: config.staticDir ?? fileURLToPath(new URL('../../client', import.meta.url)),
 });

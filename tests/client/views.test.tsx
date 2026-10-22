@@ -167,15 +167,20 @@ describe('plan workspace', () => {
   it('locks a typed budget line and keeps the total exact', async () => {
     const user = userEvent.setup();
     const { container } = renderWithProviders(<PlanView id="plan-1" tab="budget" />, [freshPlan()]);
+    const planned = () =>
+      screen
+        .getAllByRole('textbox', { name: /^Planned for / })
+        .map((input) => Number((input as HTMLInputElement).value.replace(/,/g, '')));
+    const before = planned();
     const food = await screen.findByRole('textbox', { name: 'Planned for Food & snacks' });
     await user.clear(food);
     await user.type(food, '10,000{Enter}');
     expect(await screen.findByText('Set by you')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Planned for Food & snacks' })).toHaveValue(
-      '10,000',
-    );
-    const totals = screen.getAllByText('₹25,000');
-    expect(totals.length).toBeGreaterThan(0);
+    const after = planned();
+    expect(after.reduce((a, b) => a + b, 0)).toBe(25_000);
+    expect(after).toContain(10_000);
+    // The other lines moved to make room.
+    expect(after.filter((value, i) => value !== before[i]).length).toBeGreaterThan(1);
     expect(await axeViolations(container)).toEqual([]);
   });
 
@@ -200,7 +205,8 @@ describe('plan workspace', () => {
       'true',
     );
     await user.click(screen.getByRole('button', { name: 'Saved (1)' }));
-    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(1);
+    const shown = document.querySelector('.ideas-grid');
+    expect(shown?.querySelectorAll('h3')).toHaveLength(1);
   });
 
   it('previews an AI refinement and applies it only when asked', async () => {

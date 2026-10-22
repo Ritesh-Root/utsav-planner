@@ -782,6 +782,31 @@ fieldset {
   width: fit-content;
   font-size: var(--fs-small);
 }
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: var(--fs-small);
+}
+.quiet-link {
+  color: var(--muted);
+  font-weight: 400;
+}
+.time-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.compact-form {
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+.inner.form {
+  margin-top: 8px;
+}
 .time-row {
   grid-template-columns: 56px minmax(0, 1fr);
   min-height: 40px;
@@ -1070,6 +1095,10 @@ details > summary {
     right: 16px;
     bottom: 16px;
     left: 16px;
+  }
+  /* Room under the last control so the Undo toast never covers it. */
+  .canvas {
+    padding-bottom: 160px;
   }
 }
 

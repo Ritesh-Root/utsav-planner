@@ -10,7 +10,7 @@ import {
   toRefineContext,
 } from '../../shared/plan.js';
 import type { Plan, RefineScope } from '../../shared/schemas.js';
-import { REFINE_SCOPES } from '../../shared/schemas.js';
+import { REFINE_SCOPES } from '../../shared/constants.js';
 import { ApiError, requestRefinement } from '../api';
 import { SCOPE_LABELS, SUGGESTIONS } from '../labels';
 import { useAnnounce } from '../state/announcer';
@@ -180,7 +180,7 @@ export function RefinePanel({
               }}
             />
           </div>
-          <div className="chips" aria-label="Suggestions">
+          <div className="chips" role="group" aria-label="Suggestions">
             {SUGGESTIONS[scope].map((suggestion) => (
               <button
                 key={suggestion}

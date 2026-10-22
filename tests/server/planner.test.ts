@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { AiError } from '../../src/server/ai/gemini.js';
 import { createPlanner } from '../../src/server/ai/planner.js';
 import { HttpError } from '../../src/server/errors.js';
-import { silentLogger } from '../../src/server/logger.js';
+import { silentLogger } from '../fixtures/logger.js';
 import { toRefineContext } from '../../src/shared/plan.js';
 import type { RefineRequest } from '../../src/shared/schemas.js';
 import { PlanSchema } from '../../src/shared/schemas.js';
@@ -117,6 +117,34 @@ describe('planner.plan', () => {
     await planner.plan(birthdayBrief, TODAY);
     clock.now = new Date('2026-10-23T01:00:00Z');
     expect((await planner.plan({ ...birthdayBrief, guests: 40 }, TODAY)).meta.source).toBe('ai');
+  });
+
+  it('never opens the breaker for answers that could not be used', async () => {
+    // Invalid output is shaped by the request, so one user must not trip AI for everyone.
+    const ai = new FakeAi(reply({ title: 'thin' }));
+    const planner = plannerWith(ai);
+    for (let i = 0; i < 4; i += 1) await planner.plan({ ...birthdayBrief, guests: 20 + i }, TODAY);
+    const before = ai.calls;
+    await planner.plan({ ...birthdayBrief, guests: 99 }, TODAY);
+    expect(ai.calls).toBeGreaterThan(before);
+  });
+
+  it('never caches a failure: the next identical request asks the model again', async () => {
+    const ai = new FakeAi(new AiError('timeout'), reply(aiPlanFor(birthdayBrief)));
+    const planner = plannerWith(ai);
+    expect((await planner.plan(birthdayBrief, TODAY)).meta.source).toBe('template');
+    expect((await planner.plan(birthdayBrief, TODAY)).meta).toMatchObject({
+      source: 'ai',
+      cached: false,
+    });
+  });
+
+  it('treats a truncated answer as unusable', async () => {
+    const result = await plannerWith(new FakeAi(new AiError('max-tokens'))).plan(
+      birthdayBrief,
+      TODAY,
+    );
+    expect(result.meta.fallbackReason).toBe('The AI answer could not be used.');
   });
 
   it('opens the circuit breaker after repeated failures, then recovers', async () => {

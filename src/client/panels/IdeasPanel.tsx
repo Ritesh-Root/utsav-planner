@@ -1,11 +1,107 @@
-import { useMemo, useState } from 'react';
+import type { SubmitEvent } from 'react';
+import { useId, useMemo, useState } from 'react';
 
+import { IDEA_CATEGORIES } from '../../shared/constants.js';
+import { LIMITS } from '../../shared/limits.js';
+import { addCustomIdea, randomId, toggleIdeaSaved } from '../../shared/plan.js';
 import type { IdeaCategory } from '../../shared/schemas.js';
 import { COST_TIER_LABELS, IDEA_CATEGORY_LABELS, pluralize } from '../labels';
 import type { PanelProps } from './types';
 
 type Filter = IdeaCategory | 'all' | 'saved';
 
+function AddIdeaForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<IdeaCategory>('theme');
+  const [error, setError] = useState('');
+  const id = useId();
+
+  const submit = (event: SubmitEvent) => {
+    event.preventDefault();
+    if (title.trim() === '') {
+      setError('Give your idea a short name.');
+      return;
+    }
+    setError('');
+    update(addCustomIdea(plan, { title, description, category }, randomId, new Date()), {
+      undoable: true,
+      announcement: `Saved your idea ${title.trim()}`,
+    });
+    setTitle('');
+    setDescription('');
+  };
+
+  return (
+    <form className="inner form" onSubmit={submit} noValidate aria-labelledby={`${id}-title`}>
+      <h3 id={`${id}-title`} className="panel-title">
+        Add your own idea
+      </h3>
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="field-row">
+        <div className="field">
+          <label className="label" htmlFor={`${id}-name`}>
+            Idea
+          </label>
+          <input
+            id={`${id}-name`}
+            className="input"
+            maxLength={LIMITS.shortText}
+            value={title}
+            aria-invalid={error !== ''}
+            onChange={(e) => {
+              setTitle(e.target.value);
+            }}
+          />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor={`${id}-category`}>
+            Kind
+          </label>
+          <select
+            id={`${id}-category`}
+            className="select"
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value as IdeaCategory);
+            }}
+          >
+            {IDEA_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {IDEA_CATEGORY_LABELS[c]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="field">
+        <label className="label" htmlFor={`${id}-details`}>
+          Details (optional)
+        </label>
+        <textarea
+          id={`${id}-details`}
+          className="textarea"
+          maxLength={LIMITS.longText}
+          value={description}
+          onChange={(e) => {
+            setDescription(e.target.value);
+          }}
+        />
+      </div>
+      <div>
+        <button type="submit" className="btn btn-secondary btn-small">
+          Save idea
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Personalised ideas to save, filter and refine, plus the user's own. */
 export default function IdeasPanel({ plan, update, refine }: PanelProps) {
   const [filter, setFilter] = useState<Filter>('all');
   const categories = useMemo(
@@ -85,17 +181,9 @@ export default function IdeasPanel({ plan, update, refine }: PanelProps) {
                   aria-pressed={idea.saved}
                   aria-label={`Save: ${idea.title}`}
                   onClick={() => {
-                    update(
-                      {
-                        ...plan,
-                        ideas: plan.ideas.map((i) =>
-                          i.id === idea.id ? { ...i, saved: !i.saved } : i,
-                        ),
-                      },
-                      {
-                        announcement: `${idea.title} ${idea.saved ? 'removed from' : 'saved to'} your ideas`,
-                      },
-                    );
+                    update(toggleIdeaSaved(plan, idea.id, new Date()), {
+                      announcement: `${idea.title} ${idea.saved ? 'removed from' : 'saved to'} your ideas`,
+                    });
                   }}
                 >
                   Save
@@ -105,6 +193,7 @@ export default function IdeasPanel({ plan, update, refine }: PanelProps) {
           ))}
         </ul>
       )}
+      <AddIdeaForm plan={plan} update={update} />
     </section>
   );
 }

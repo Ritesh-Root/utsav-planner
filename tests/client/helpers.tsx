@@ -7,11 +7,16 @@ import { AnnouncerProvider } from '../../src/client/state/announcer';
 import { SettingsProvider } from '../../src/client/state/settings';
 import { PlanStoreProvider } from '../../src/client/state/store';
 
-export function renderWithProviders(ui: ReactNode, plans: Plan[] = []) {
+/** Render inside the app's providers; `plans: null` loads saved plans from localStorage instead. */
+export function renderWithProviders(ui: ReactNode, plans: Plan[] | null = []) {
   return render(
     <SettingsProvider>
       <AnnouncerProvider>
-        <PlanStoreProvider initialPlans={plans}>{ui}</PlanStoreProvider>
+        {plans === null ? (
+          <PlanStoreProvider>{ui}</PlanStoreProvider>
+        ) : (
+          <PlanStoreProvider initialPlans={plans}>{ui}</PlanStoreProvider>
+        )}
       </AnnouncerProvider>
     </SettingsProvider>,
   );

@@ -12,6 +12,7 @@ export interface Logger {
 
 type Severity = 'INFO' | 'WARNING' | 'ERROR';
 
+/** A logger that writes JSON lines, by default to standard output. */
 export function createLogger(
   write: (line: string) => void = (line) => {
     process.stdout.write(`${line}\n`);
@@ -32,9 +33,3 @@ export function createLogger(
     },
   };
 }
-
-export const silentLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined,
-};

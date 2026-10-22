@@ -98,11 +98,13 @@ describe('workspace actions', () => {
     renderWithProviders(<PlanView id="plan-1" tab="overview" />, [planFor(birthdayBrief, 30)]);
     await user.click(screen.getByRole('button', { name: 'Edit details' }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit event details' });
-    const budget = within(dialog).getByLabelText('Total budget (INR)');
+    expect(within(dialog).queryByRole('radio')).not.toBeInTheDocument();
+    const budget = within(dialog).getByLabelText('Total budget');
     await user.clear(budget);
     await user.type(budget, 'abc');
     await user.click(within(dialog).getByRole('button', { name: 'Save details' }));
-    expect(within(dialog).getByRole('alert')).toHaveTextContent(/whole number/);
+    expect(budget).toHaveAccessibleDescription(/whole number above zero/);
+    expect(within(dialog).getByRole('heading', { name: 'There is a problem' })).toBeInTheDocument();
     await user.clear(budget);
     await user.type(budget, '40000');
     await user.click(within(dialog).getByRole('button', { name: 'Save details' }));

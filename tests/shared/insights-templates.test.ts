@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { computeInsights } from '../../src/shared/insights.js';
 import { LIMITS } from '../../src/shared/limits.js';
 import { setLineAmount } from '../../src/shared/plan.js';
-import { AiPlanSchema, BriefSchema, PlanRequestSchema } from '../../src/shared/schemas.js';
+import {
+  AiPlanSchema,
+  BriefPatchSchema,
+  BriefSchema,
+  PlanRequestSchema,
+} from '../../src/shared/schemas.js';
 import { buildTemplateDraft } from '../../src/shared/templates/index.js';
 import {
   NOW,
@@ -124,6 +129,13 @@ describe('schemas', () => {
     const result = BriefSchema.safeParse({ ...weddingBrief, honoreeAge: 30 });
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['honoreeAge']);
+  });
+
+  it('lets a refinement patch only the brief fields it may change, with the same rules', () => {
+    expect(BriefPatchSchema.safeParse({ guests: 45 }).success).toBe(true);
+    expect(BriefPatchSchema.safeParse({}).success).toBe(true);
+    expect(BriefPatchSchema.safeParse({ guests: 0 }).success).toBe(false);
+    expect(BriefPatchSchema.safeParse({ type: 'wedding' }).success).toBe(false);
   });
 
   it('validates the plan request wrapper', () => {

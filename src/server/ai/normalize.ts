@@ -1,5 +1,5 @@
 import { LIMITS } from '../../shared/limits.js';
-import { toWholeAmount } from '../../shared/money.js';
+import { estimateCap, toWholeAmount } from '../../shared/money.js';
 import { cleanText, dedupeKey, uniqueBy } from '../../shared/sanitize.js';
 import type {
   AiBudgetLine,
@@ -14,7 +14,13 @@ import type {
   RefineScope,
 } from '../../shared/schemas.js';
 import { AiPlanSchema, AiRefineSchema, BriefPatchSchema } from '../../shared/schemas.js';
-import { clampDaysBefore, eventDateIssue } from '../../shared/timeline.js';
+import {
+  clampBookDays,
+  clampDay,
+  clampDaysBefore,
+  clampStartMinute,
+  eventDateIssue,
+} from '../../shared/timeline.js';
 
 /** The model answered, but not with something we can safely use. Retried once. */
 export class InvalidOutputError extends Error {
@@ -34,7 +40,7 @@ function cleanList(values: readonly string[], max: number, length: number): stri
 }
 
 function cleanBudget<T extends AiBudgetLine>(lines: readonly T[], budget: number): T[] {
-  const cap = budget * 3;
+  const cap = estimateCap(budget);
   const cleaned = lines
     .map((line) => ({
       ...line,
@@ -78,7 +84,7 @@ function cleanVendors<T extends AiVendor>(vendors: readonly T[]): T[] {
         ...vendor,
         category: cleanText(vendor.category, shortText),
         why: cleanText(vendor.why, mediumText),
-        bookDaysBefore: Math.max(clampDaysBefore(vendor.bookDaysBefore), 0),
+        bookDaysBefore: clampBookDays(vendor.bookDaysBefore),
         questions: cleanList(vendor.questions, LIMITS.questionsMax, mediumText),
       }))
       .filter((vendor) => vendor.category.length > 0 && vendor.questions.length > 0),
@@ -104,8 +110,8 @@ function cleanDayOf<T extends AiDayOf>(items: readonly T[], days: number): T[] {
     .map((item) => ({
       ...item,
       title: cleanText(item.title, shortText),
-      day: Math.min(Math.max(Math.round(item.day), 1), days),
-      startMinute: Math.min(Math.max(Math.round(item.startMinute), 0), 24 * 60 - 1),
+      day: clampDay(item.day, days),
+      startMinute: clampStartMinute(item.startMinute),
     }))
     .filter((item) => item.title.length > 0)
     .slice(0, LIMITS.dayOfMax);
@@ -146,7 +152,7 @@ export function normalizePlanDraft(raw: unknown, brief: Brief): AiPlan {
 const REFINE_MINIMUMS = { budget: 3, timeline: 3, vendors: 2, ideas: 3, dayOf: 1 } as const;
 
 function keepId<T extends { id?: string | undefined }>(item: T): T {
-  if (item.id === undefined || (item.id.length > 0 && item.id.length <= 64)) return item;
+  if (item.id === undefined || (item.id.length > 0 && item.id.length <= LIMITS.idMax)) return item;
   const { id: _dropped, ...rest } = item;
   return rest as T;
 }

@@ -2,7 +2,7 @@ import { finalizePlan, randomId } from '../shared/plan.js';
 import type { Brief, Plan } from '../shared/schemas.js';
 import { buildTemplateDraft } from '../shared/templates/index.js';
 
-export const OFFLINE_REASON =
+const OFFLINE_REASON =
   'Utsav’s planning service couldn’t be reached, so this plan was built on your device from templates.';
 
 /** Loaded on demand: a complete plan built in the browser when the API is unreachable. */

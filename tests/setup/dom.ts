@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 // jsdom 30 has no <dialog> behaviour, so give it the minimum the app relies on.
 if (!('showModal' in HTMLDialogElement.prototype)) {
@@ -28,8 +28,14 @@ if (typeof window.matchMedia !== 'function') {
   });
 }
 
-// Tests must never reach the network; individual tests stub fetch explicitly.
-vi.stubGlobal('fetch', () => Promise.reject(new Error('Network access is disabled in tests')));
+// Tests must never reach the network. Re-stub before every test: files call
+// vi.unstubAllGlobals(), which would otherwise restore the real fetch.
+beforeEach(() => {
+  vi.stubGlobal('fetch', () => Promise.reject(new Error('Network access is disabled in tests')));
+});
+
+// axe-core probes <canvas>; jsdom has none, so answer null instead of logging noise.
+HTMLCanvasElement.prototype.getContext = () => null;
 
 afterEach(() => {
   cleanup();

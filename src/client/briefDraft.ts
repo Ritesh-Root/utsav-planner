@@ -1,6 +1,7 @@
 import { addDays } from '../shared/dates.js';
 import { LIMITS } from '../shared/limits.js';
 import type { Currency } from '../shared/money.js';
+import { parseWholeNumber } from '../shared/money.js';
 import type { Brief, Dietary, EventType, Priority, VenuePreference } from '../shared/schemas.js';
 import { BriefSchema } from '../shared/schemas.js';
 import { eventDateIssue } from '../shared/timeline.js';
@@ -61,6 +62,7 @@ export const FIELD_LABELS: Record<BriefField, string> = {
   notes: 'Anything else',
 };
 
+/** A blank form for a new event, dated a month from today. */
 export function emptyDraft(today: string): BriefDraft {
   return {
     type: 'birthday',
@@ -80,6 +82,7 @@ export function emptyDraft(today: string): BriefDraft {
   };
 }
 
+/** The form state for an existing brief (a sample, or a plan being edited). */
 export function draftFromBrief(brief: Brief): BriefDraft {
   return {
     ...brief,
@@ -88,12 +91,6 @@ export function draftFromBrief(brief: Brief): BriefDraft {
     days: String(brief.days),
     honoreeAge: brief.honoreeAge === null ? '' : String(brief.honoreeAge),
   };
-}
-
-/** Whole numbers only; spaces and thousands separators are forgiven. */
-function toInteger(value: string): number | null {
-  const cleaned = value.replace(/[\s,_]/g, '');
-  return /^\d+$/.test(cleaned) ? Number(cleaned) : null;
 }
 
 const MESSAGES: Partial<Record<BriefField, string>> = {
@@ -109,6 +106,7 @@ const MESSAGES: Partial<Record<BriefField, string>> = {
   priorities: `Choose up to ${LIMITS.prioritiesMax}.`,
 };
 
+/** Validate the form: a Brief, or a plain-language message for each field to fix. */
 export function toBrief(
   draft: BriefDraft,
   today: string,
@@ -119,15 +117,15 @@ export function toBrief(
     title: draft.title,
     date: draft.date,
     location: draft.location,
-    guests: toInteger(draft.guests),
-    budget: toInteger(draft.budget),
+    guests: parseWholeNumber(draft.guests),
+    budget: parseWholeNumber(draft.budget),
     currency: draft.currency,
     venue: draft.venue,
     style: draft.style,
     priorities: draft.priorities,
     dietary: draft.dietary,
-    days: draft.type === 'birthday' ? 1 : toInteger(draft.days),
-    honoreeAge: draft.type === 'birthday' && ageText !== '' ? toInteger(ageText) : null,
+    days: draft.type === 'birthday' ? 1 : parseWholeNumber(draft.days),
+    honoreeAge: draft.type === 'birthday' && ageText !== '' ? parseWholeNumber(ageText) : null,
     notes: draft.notes,
   };
 
@@ -140,7 +138,7 @@ export function toBrief(
     }
   }
   // An age that was typed but is not a number fails the number check above, not the schema.
-  if (draft.type === 'birthday' && ageText !== '' && toInteger(ageText) === null) {
+  if (draft.type === 'birthday' && ageText !== '' && parseWholeNumber(ageText) === null) {
     errors.honoreeAge = MESSAGES.honoreeAge;
   }
   if (!errors.date) {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { RequestHandler } from 'express';
+import type { AugmentedRequest } from 'express-rate-limit';
 import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
 
@@ -98,21 +99,24 @@ export interface RateLimitSettings {
   limit: number;
 }
 
+/** Per-client request limit that answers with our JSON 429 and an accurate Retry-After. */
 export function createRateLimiter(settings: RateLimitSettings, label: string): RequestHandler {
   return rateLimit({
     windowMs: settings.windowMs,
     limit: settings.limit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    handler: (_req, _res, next, options) => {
+    handler: (req, _res, next, options) => {
+      const reset = (req as AugmentedRequest).rateLimit?.resetTime;
+      const retryAfterSec = reset
+        ? Math.max(1, Math.ceil((reset.getTime() - Date.now()) / 1000))
+        : Math.ceil(options.windowMs / 1000);
       next(
         new HttpError(
           429,
           'RATE_LIMITED',
           `Too many ${label}. Please wait a moment and try again.`,
-          {
-            retryAfterSec: Math.ceil(options.windowMs / 1000),
-          },
+          { retryAfterSec },
         ),
       );
     },

@@ -1,7 +1,7 @@
 import { allocate, projectGuests, toBasisPoints, withContingency } from './budget.js';
 import { diffDays } from './dates.js';
 import { LIMITS } from './limits.js';
-import { toWholeAmount } from './money.js';
+import { estimateCap, toWholeAmount } from './money.js';
 import type {
   AiBudgetLine,
   AiPlan,
@@ -10,6 +10,7 @@ import type {
   BudgetLine,
   DayOfItem,
   Idea,
+  IdeaCategory,
   Plan,
   PlanSource,
   RefineContext,
@@ -18,13 +19,21 @@ import type {
   TaskPriority,
   Vendor,
 } from './schemas.js';
-import { PLAN_VERSION } from './schemas.js';
-import { clampDaysBefore, schedule, sortTasks } from './timeline.js';
+import { PLAN_VERSION } from './constants.js';
+import {
+  clampBookDays,
+  clampDay,
+  clampDaysBefore,
+  clampStartMinute,
+  schedule,
+  sortTasks,
+} from './timeline.js';
 import { truncate } from './sanitize.js';
 import { vendorHasUserData } from './vendors.js';
 
 export type IdFactory = (prefix: string) => string;
 
+/** Short random ids such as `task-1a2b3c4d`; unique enough for one person's plans. */
 export const randomId: IdFactory = (prefix) =>
   `${prefix}-${globalThis.crypto.randomUUID().slice(0, 8)}`;
 
@@ -36,6 +45,7 @@ interface BudgetEntry {
   previous?: BudgetLine;
   key: BudgetKey;
   category: string;
+  /** Relative weight on a 0–100 (percentage) scale. */
   share: number;
   perGuest: boolean;
   rationale: string;
@@ -66,7 +76,7 @@ function entryFromLine(line: BudgetLine): BudgetEntry {
     previous: line,
     key: line.key,
     category: line.category,
-    share: line.shareBp,
+    share: line.shareBp / 100,
     perGuest: line.perGuest,
     rationale: line.rationale,
     estLow: line.estLow,
@@ -102,11 +112,11 @@ function buildBudgetLines(
     };
   });
   const { amounts } = allocate(total, drafts);
-  const estimateCap = total * 3;
+  const cap = estimateCap(total);
   return drafts.map((line, index) => {
     const amount = amounts[index] ?? 0;
-    let low = toWholeAmount(Math.min(line.estLow, line.estHigh), estimateCap);
-    let high = toWholeAmount(Math.max(line.estLow, line.estHigh), estimateCap);
+    let low = toWholeAmount(Math.min(line.estLow, line.estHigh), cap);
+    let high = toWholeAmount(Math.max(line.estLow, line.estHigh), cap);
     if (high === 0) {
       low = Math.round(amount * 0.8);
       high = Math.round(amount * 1.25);
@@ -159,7 +169,7 @@ function makeVendor(
   today: string,
   id: string,
 ): Vendor {
-  const bookDaysBefore = Math.max(clampDaysBefore(item.bookDaysBefore), 0);
+  const bookDaysBefore = clampBookDays(item.bookDaysBefore);
   return {
     id,
     category: truncate(item.category, LIMITS.shortText),
@@ -181,8 +191,8 @@ function makeVendor(
 function makeDayOf(item: AiPlan['dayOf'][number], brief: Brief, id: string): DayOfItem {
   return {
     id,
-    day: Math.min(Math.max(Math.round(item.day), 1), brief.days),
-    startMinute: Math.min(Math.max(Math.round(item.startMinute), 0), 24 * 60 - 1),
+    day: clampDay(item.day, brief.days),
+    startMinute: clampStartMinute(item.startMinute),
     title: truncate(item.title, LIMITS.shortText),
   };
 }
@@ -274,6 +284,7 @@ export function setLineAmount(plan: Plan, lineId: string, amount: number, now: D
   return touch(plan, now, { budget: reallocate(budget, plan.brief.budget) });
 }
 
+/** Let Utsav set this line again: unlock it and rebalance. */
 export function unlockLine(plan: Plan, lineId: string, now: Date): Plan {
   const budget = plan.budget.map((line) =>
     line.id === lineId ? { ...line, locked: false } : line,
@@ -281,6 +292,7 @@ export function unlockLine(plan: Plan, lineId: string, now: Date): Plan {
   return touch(plan, now, { budget: reallocate(budget, plan.brief.budget) });
 }
 
+/** Record money spent on a line; the plan itself does not change. */
 export function setLineActual(plan: Plan, lineId: string, actual: number, now: Date): Plan {
   return touch(plan, now, {
     budget: plan.budget.map((line) =>
@@ -319,6 +331,7 @@ export function applyGuestChange(
   });
 }
 
+/** Add the user's own task, scheduled relative to the event date. */
 export function addCustomTask(
   plan: Plan,
   input: { title: string; due: string; priority: TaskPriority },
@@ -338,6 +351,150 @@ export function addCustomTask(
     custom: true,
   };
   return touch(plan, now, { tasks: sortTasks([...plan.tasks, task]) });
+}
+
+/** Tick a task as done, or untick it. */
+export function toggleTaskDone(plan: Plan, taskId: string, now: Date): Plan {
+  return touch(plan, now, {
+    tasks: plan.tasks.map((task) => (task.id === taskId ? { ...task, done: !task.done } : task)),
+  });
+}
+
+/** Take a task off the timeline. */
+export function removeTask(plan: Plan, taskId: string, now: Date): Plan {
+  return touch(plan, now, { tasks: plan.tasks.filter((task) => task.id !== taskId) });
+}
+
+export type VendorChanges = Partial<
+  Pick<Vendor, 'status' | 'contactName' | 'contact' | 'quote' | 'notes'>
+>;
+
+/** Change a vendor's status or the user's own notes about it. */
+export function updateVendor(
+  plan: Plan,
+  vendorId: string,
+  changes: VendorChanges,
+  now: Date,
+): Plan {
+  return touch(plan, now, {
+    vendors: plan.vendors.map((vendor) =>
+      vendor.id === vendorId ? { ...vendor, ...changes } : vendor,
+    ),
+  });
+}
+
+/** Add a vendor type the plan does not have, to be booked by the given date. */
+export function addCustomVendor(
+  plan: Plan,
+  input: { category: string; budgetKey: BudgetKey; bookBy: string },
+  newId: IdFactory,
+  today: string,
+  now: Date,
+): Plan {
+  const bookDaysBefore = clampBookDays(diffDays(input.bookBy, plan.brief.date));
+  const vendor: Vendor = {
+    id: newId('vendor'),
+    category: truncate(input.category.trim(), LIMITS.shortText),
+    budgetKey: input.budgetKey,
+    why: 'Added by you.',
+    questions: [],
+    bookDaysBefore,
+    bookBy: schedule(plan.brief.date, bookDaysBefore, today).due,
+    status: 'not-started',
+    contactName: '',
+    contact: '',
+    quote: 0,
+    notes: '',
+  };
+  return touch(plan, now, { vendors: [...plan.vendors, vendor].sort(byBookBy) });
+}
+
+/** Take a vendor off the checklist. */
+export function removeVendor(plan: Plan, vendorId: string, now: Date): Plan {
+  return touch(plan, now, { vendors: plan.vendors.filter((vendor) => vendor.id !== vendorId) });
+}
+
+/** Save an idea, or take it out of the saved ones. */
+export function toggleIdeaSaved(plan: Plan, ideaId: string, now: Date): Plan {
+  return touch(plan, now, {
+    ideas: plan.ideas.map((idea) => (idea.id === ideaId ? { ...idea, saved: !idea.saved } : idea)),
+  });
+}
+
+/** Add the user's own idea; it starts saved so refinements keep it. */
+export function addCustomIdea(
+  plan: Plan,
+  input: { title: string; description: string; category: IdeaCategory },
+  newId: IdFactory,
+  now: Date,
+): Plan {
+  const idea: Idea = {
+    id: newId('idea'),
+    category: input.category,
+    title: truncate(input.title.trim(), LIMITS.shortText),
+    description: truncate(input.description.trim(), LIMITS.longText),
+    costTier: 'low',
+    saved: true,
+  };
+  return touch(plan, now, { ideas: [idea, ...plan.ideas] });
+}
+
+/**
+ * Add a budget line with an amount the user sets. It is locked like any typed
+ * amount, so the other unlocked lines rebalance around it.
+ */
+export function addBudgetLine(
+  plan: Plan,
+  input: { category: string; amount: number },
+  newId: IdFactory,
+  now: Date,
+): Plan {
+  const line: BudgetLine = {
+    id: newId('budget'),
+    key: 'misc',
+    category: truncate(input.category.trim(), LIMITS.shortText),
+    shareBp: 0,
+    perGuest: false,
+    rationale: 'Added by you.',
+    estLow: 0,
+    estHigh: 0,
+    amount: toWholeAmount(input.amount, LIMITS.budgetMax),
+    locked: true,
+    actual: 0,
+  };
+  return touch(plan, now, { budget: reallocate([...plan.budget, line], plan.brief.budget) });
+}
+
+/** Remove a budget line and rebalance the rest. The last line cannot be removed. */
+export function removeBudgetLine(plan: Plan, lineId: string, now: Date): Plan {
+  if (plan.budget.length <= 1) return plan;
+  return touch(plan, now, {
+    budget: reallocate(
+      plan.budget.filter((line) => line.id !== lineId),
+      plan.brief.budget,
+    ),
+  });
+}
+
+/** Add an item to the run sheet, kept in day and time order. */
+export function addDayOfItem(
+  plan: Plan,
+  input: { day: number; startMinute: number; title: string },
+  newId: IdFactory,
+  now: Date,
+): Plan {
+  const item: DayOfItem = {
+    id: newId('day'),
+    day: clampDay(input.day, plan.brief.days),
+    startMinute: clampStartMinute(input.startMinute),
+    title: truncate(input.title.trim(), LIMITS.shortText),
+  };
+  return touch(plan, now, { dayOf: [...plan.dayOf, item].sort(byDayAndTime) });
+}
+
+/** Take an item off the run sheet. */
+export function removeDayOfItem(plan: Plan, itemId: string, now: Date): Plan {
+  return touch(plan, now, { dayOf: plan.dayOf.filter((item) => item.id !== itemId) });
 }
 
 // ---------------------------------------------------------------------------
@@ -422,8 +579,7 @@ export function mergeRefinement(plan: Plan, result: RefineResult, options: Merge
     const ids = claimer(plan.budget);
     const entries = sections.budget.map((item) => entryFromAi(item, ids.claim(item.id)));
     const kept = plan.budget.filter((l) => !ids.isClaimed(l.id) && (l.locked || l.actual > 0));
-    // Kept lines carry basis points; express everything on the same 0–100 scale.
-    const keptEntries = kept.map((line) => ({ ...entryFromLine(line), share: line.shareBp / 100 }));
+    const keptEntries = kept.map(entryFromLine);
     next = { ...next, budget: buildBudgetLines([...entries, ...keptEntries], brief.budget, newId) };
   }
 
@@ -526,6 +682,7 @@ function diffSection<T extends { id: string }>(
   return { added, removed, changed };
 }
 
+/** Counts of what was added, removed or changed in each section, and which brief fields changed. */
 export function diffPlans(before: Plan, after: Plan): PlanDiff {
   const briefKeys = Object.keys(after.brief) as (keyof Brief)[];
   return {

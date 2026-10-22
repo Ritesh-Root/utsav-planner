@@ -119,6 +119,27 @@ describe('normalizeRefine', () => {
     expect(result.message).toBe('Updated your plan.');
   });
 
+  it('keeps every returned section for the whole plan, within patched limits', () => {
+    const draft = aiPlanFor(weddingBrief);
+    const result = normalizeRefine(
+      {
+        message: 'More days',
+        briefPatch: { days: 2, budget: 100 },
+        budget: draft.budget,
+        timeline: draft.timeline,
+        vendors: draft.vendors,
+        dayOf: [...draft.dayOf, { day: 5, startMinute: 600, title: 'Extra' }],
+      },
+      'all',
+      weddingBrief,
+      TODAY,
+    );
+    expect(Object.keys(result.sections).sort()).toEqual(['budget', 'dayOf', 'timeline', 'vendors']);
+    expect(result.sections.dayOf?.every((d) => d.day <= 2)).toBe(true);
+    // Estimates are capped against the patched budget, not the old one.
+    expect(result.sections.budget?.every((l) => l.estHigh <= 300)).toBe(true);
+  });
+
   it('rejects a malformed refinement', () => {
     expect(() => normalizeRefine({ nope: true }, 'all', birthdayBrief, TODAY)).toThrow(
       InvalidOutputError,

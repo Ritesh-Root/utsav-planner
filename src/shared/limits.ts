@@ -39,6 +39,10 @@ export const LIMITS = {
 
   contingencyMinPct: 5,
   contingencyMaxPct: 15,
+  /** Share given to a contingency line the plan was missing. */
+  contingencyDefaultPct: 8,
+  /** AI cost estimates above this multiple of the whole budget are treated as noise. */
+  estimateCapMultiple: 3,
 
   shortText: 80,
   mediumText: 200,
@@ -47,6 +51,13 @@ export const LIMITS = {
   /** Private user-entered vendor fields, kept in the browser only. */
   vendorFieldMax: 120,
   vendorNotesMax: 500,
+
+  /** Ids of plans and of items inside them. */
+  idMax: 64,
+  /** Last minute of a day, for run-sheet times. */
+  dayMinutesMax: 24 * 60 - 1,
+  /** Field errors returned in one validation response. */
+  fieldErrorsMax: 20,
 
   importBytesMax: 256 * 1024,
   requestBytesMax: 32 * 1024,

@@ -55,6 +55,15 @@ const FALLBACK_REASONS = {
 } as const;
 type FallbackKind = keyof typeof FALLBACK_REASONS;
 
+/** Failures that mean the model service itself is struggling. */
+const SERVICE_FAULTS: ReadonlySet<AiErrorKind> = new Set([
+  'timeout',
+  'rate-limit',
+  'server',
+  'network',
+  'client',
+]);
+
 class PlannerFailure extends Error {
   constructor(readonly kind: FallbackKind) {
     super(kind);
@@ -105,6 +114,10 @@ function canonicalBrief(brief: Brief): Brief {
   return { ...brief, priorities: [...brief.priorities].sort(), dietary: [...brief.dietary].sort() };
 }
 
+/**
+ * The planning service: turns a brief into a plan and applies refinements,
+ * using Gemini when it can and the template engine when it cannot.
+ */
 export function createPlanner(deps: PlannerDeps): Planner {
   const { ai, logger } = deps;
   const now = deps.now ?? (() => new Date());
@@ -136,12 +149,13 @@ export function createPlanner(deps: PlannerDeps): Planner {
     parse: (raw: unknown) => T,
   ): Promise<T> {
     if (!ai) throw new PlannerFailure('off');
-    const started = Date.now();
+    const clock = () => now().getTime();
+    const started = clock();
     for (let attempt = 1; ; attempt += 1) {
       if (!breaker.allows()) throw new PlannerFailure('breaker');
       if (!budget.tryConsume()) throw new PlannerFailure('cap');
-      const remaining = AI_LIMITS.totalBudgetMs - (Date.now() - started);
-      const callStarted = Date.now();
+      const remaining = AI_LIMITS.totalBudgetMs - (clock() - started);
+      const callStarted = clock();
       try {
         const response = await ai.generate({
           ...request,
@@ -161,25 +175,30 @@ export function createPlanner(deps: PlannerDeps): Planner {
           model: ai.model,
           attempt,
           outcome: 'ok',
-          latencyMs: Date.now() - callStarted,
+          latencyMs: clock() - callStarted,
           promptChars: request.prompt.length,
           promptTokens: response.usage.promptTokens,
           outputTokens: response.usage.outputTokens,
+          thoughtTokens: response.usage.thoughtTokens,
+          cachedTokens: response.usage.cachedTokens,
         });
         return value;
       } catch (error) {
         const retryable =
           error instanceof InvalidOutputError || (error instanceof AiError && error.retryable);
-        const kind = error instanceof AiError ? error.kind : failureKind(error);
-        if (!(error instanceof AiError && error.kind === 'blocked')) breaker.recordFailure();
+        // Only faults of the AI service open the breaker. An answer that could not be
+        // used is shaped by the request itself, so one user cannot trip it for everyone.
+        if (error instanceof AiError && SERVICE_FAULTS.has(error.kind)) breaker.recordFailure();
         logger.warn('ai call failed', {
           route: label,
           model: ai.model,
           attempt,
-          outcome: kind,
-          latencyMs: Date.now() - callStarted,
+          outcome: error instanceof AiError ? error.kind : 'invalid-output',
+          // Messages hold no user text (e.g. "too few ideas"); names expose code bugs.
+          reason: error instanceof Error ? `${error.name}: ${error.message}` : 'unknown',
+          latencyMs: clock() - callStarted,
         });
-        const timeLeft = AI_LIMITS.totalBudgetMs - (Date.now() - started);
+        const timeLeft = AI_LIMITS.totalBudgetMs - (clock() - started);
         if (!retryable || attempt >= 2 || timeLeft < AI_LIMITS.minRetryWindowMs) throw error;
         await sleep(200 + Math.floor(Math.random() * 400));
       }
@@ -213,7 +232,7 @@ export function createPlanner(deps: PlannerDeps): Planner {
     model,
 
     async plan(brief, today) {
-      const started = Date.now();
+      const started = now().getTime();
       const key = hash([
         PROMPT_VERSION,
         model,
@@ -259,14 +278,14 @@ export function createPlanner(deps: PlannerDeps): Planner {
           source: plan.source,
           fallbackReason: plan.fallbackReason,
           cached,
-          latencyMs: Date.now() - started,
+          latencyMs: now().getTime() - started,
           model: plan.model,
         },
       };
     },
 
     async refine(request) {
-      const started = Date.now();
+      const started = now().getTime();
       const key = hash([
         PROMPT_VERSION,
         model,

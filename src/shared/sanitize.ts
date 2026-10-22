@@ -11,6 +11,10 @@ const INVISIBLE =
 const MARKDOWN = /[*_`#>~|[\]]/g;
 const URL_PATTERN = /\b(?:https?:\/\/|www\.)\S+/gi;
 const EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+// Bare domains such as "shop.example.in" with no scheme. The top-level domain must be
+// lower case, so ordinary prose ("venue.In the morning") is left alone.
+const BARE_DOMAIN =
+  /\b[\w-]+(?:\.[\w-]+)*\.(?:com|in|org|net|co|io|shop|store|biz|info|app|online|site)\b(?:\/\S*)?/g;
 // A run of digits with spaces, dots, dashes or brackets between them. Commas are
 // excluded so amounts like ₹2,50,000 survive; colons are excluded so 18:30 does.
 const PHONE_CANDIDATE = /\+?\(?\d[\d\s().-]{7,}\d/g;
@@ -30,6 +34,7 @@ export function cleanText(input: string, maxLength: number): string {
       .replace(INVISIBLE, '')
       .replace(URL_PATTERN, '')
       .replace(EMAIL_PATTERN, '')
+      .replace(BARE_DOMAIN, '')
       .replace(MARKDOWN, ''),
   )
     .replace(/\s+/g, ' ')

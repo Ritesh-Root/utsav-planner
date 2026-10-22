@@ -7,7 +7,7 @@ import { gzipSync } from 'node:zlib';
 
 const DIST = 'dist/client';
 const KB = 1024;
-const BUDGET = { initialJs: 110 * KB, lazyChunk: 30 * KB, css: 10 * KB };
+const BUDGET = { initialJs: 80 * KB, lazyChunk: 30 * KB, css: 10 * KB };
 
 const gz = (file) => gzipSync(readFileSync(join(DIST, file))).length;
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');

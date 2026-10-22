@@ -5,10 +5,10 @@ import { formatDate, formatMinutes } from '../../shared/dates.js';
 import { computeInsights } from '../../shared/insights.js';
 import { formatMoney } from '../../shared/money.js';
 import { sortTasks, taskProgress } from '../../shared/timeline.js';
-import { VENDOR_STATUS_LABELS, vendorProgress, vendorState } from '../../shared/vendors.js';
+import { vendorProgress, vendorState } from '../../shared/vendors.js';
 import { Money, Pill, Track } from '../components/Display';
-import { COST_TIER_LABELS, IDEA_CATEGORY_LABELS, pluralize } from '../labels';
-import { TaskRow, toggleTask } from './TaskRow';
+import { COST_TIER_LABELS, IDEA_CATEGORY_LABELS, VENDOR_STATUS_LABELS, pluralize } from '../labels';
+import { TaskRow, useTaskActions } from './TaskRow';
 import type { PanelProps } from './types';
 
 const TONE = {
@@ -18,7 +18,9 @@ const TONE = {
   success: 'positive',
 } as const;
 
+/** The plan at a glance: what to do next, money, vendors, ideas, notes and the run sheet. */
 export default function OverviewPanel({ plan, today, update, goTo }: PanelProps) {
+  const { onToggle } = useTaskActions({ plan, update });
   const { brief } = plan;
   const budget = useMemo(
     () => summarizeBudget(plan.budget, brief.budget, brief.guests),
@@ -64,20 +66,7 @@ export default function OverviewPanel({ plan, today, update, goTo }: PanelProps)
         ) : (
           <ul className="rows">
             {nextTasks.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                today={today}
-                onToggle={(t) => {
-                  update(
-                    { ...plan, tasks: toggleTask(t, plan.tasks) },
-                    {
-                      undoable: true,
-                      announcement: `${t.title} marked ${t.done ? 'not done' : 'done'}`,
-                    },
-                  );
-                }}
-              />
+              <TaskRow key={task.id} task={task} today={today} onToggle={onToggle} />
             ))}
           </ul>
         )}

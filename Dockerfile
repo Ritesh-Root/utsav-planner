@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
+# Base images are pinned by tag and digest, so a rebuild uses exactly the same layers.
 # Build: compile the SPA and the server. Slim (glibc) so native build tools install cleanly.
-FROM node:24.22.1-slim AS build
+FROM node:24.22.1-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
@@ -8,7 +9,7 @@ COPY . .
 RUN npm run build
 
 # Runtime: production dependencies only, files owned by root, the app runs as `node`.
-FROM node:24.22.1-alpine AS runtime
+FROM node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS runtime
 ENV NODE_ENV=production \
     PORT=8080
 WORKDIR /app

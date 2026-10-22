@@ -2,8 +2,9 @@ import type { KeyboardEvent, ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import type { Currency } from '../../shared/money.js';
-import { formatMoney } from '../../shared/money.js';
+import { formatMoney, parseWholeNumber } from '../../shared/money.js';
 
+/** An amount in the plan's currency, with tabular digits. */
 export function Money({ amount, currency }: { amount: number; currency: Currency }) {
   return <span className="num">{formatMoney(amount, currency)}</span>;
 }
@@ -53,6 +54,7 @@ export function Track({
   );
 }
 
+/** A small status label; the tone is never the only signal, the words carry it. */
 export function Pill({
   tone = 'neutral',
   children,
@@ -74,16 +76,21 @@ export function AmountInput({
   value,
   onCommit,
   label,
+  id,
   max,
 }: {
   value: number;
   onCommit: (value: number) => void;
-  label: string;
+  /** Accessible name; leave out when a visible <label htmlFor={id}> names it. */
+  label?: string;
+  id?: string;
   max: number;
 }) {
   const [text, setText] = useState(() => grouped.format(value));
   const [invalid, setInvalid] = useState(false);
-  const errorId = useId();
+  const fallbackId = useId();
+  const inputId = id ?? fallbackId;
+  const errorId = `${inputId}-error`;
   const editing = useRef(false);
 
   useEffect(() => {
@@ -92,14 +99,14 @@ export function AmountInput({
 
   const commit = () => {
     editing.current = false;
-    const cleaned = text.replace(/[\s,_]/g, '');
-    if (!/^\d+$/.test(cleaned) || Number(cleaned) > max) {
+    const amount = parseWholeNumber(text);
+    if (amount === null || amount > max) {
       setInvalid(true);
       return;
     }
     setInvalid(false);
-    setText(grouped.format(Number(cleaned)));
-    if (Number(cleaned) !== value) onCommit(Number(cleaned));
+    setText(grouped.format(amount));
+    if (amount !== value) onCommit(amount);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -116,6 +123,7 @@ export function AmountInput({
       <input
         className="input input-compact"
         inputMode="numeric"
+        id={inputId}
         aria-label={label}
         aria-invalid={invalid}
         aria-describedby={invalid ? errorId : undefined}
@@ -138,6 +146,7 @@ export function AmountInput({
   );
 }
 
+/** A message after an undoable change, with Undo; screen readers hear it via the live region. */
 export function Toast({
   message,
   action,
@@ -155,13 +164,8 @@ export function Toast({
           {action.label}
         </button>
       )}
-      <button
-        type="button"
-        className="btn btn-small"
-        onClick={onDismiss}
-        aria-label="Dismiss message"
-      >
-        Close
+      <button type="button" className="btn btn-small" onClick={onDismiss}>
+        Dismiss
       </button>
     </div>
   );

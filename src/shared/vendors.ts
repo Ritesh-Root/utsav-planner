@@ -1,20 +1,12 @@
 import { diffDays } from './dates.js';
-import type { BudgetKey, Vendor, VendorStatus } from './schemas.js';
-
-export const VENDOR_STATUS_LABELS: Record<VendorStatus, string> = {
-  'not-started': 'Not started',
-  researching: 'Researching',
-  contacted: 'Contacted',
-  quoted: 'Quote received',
-  booked: 'Booked',
-  'not-needed': 'Not needed',
-};
+import type { BudgetKey, Vendor } from './schemas.js';
 
 /** Book-by dates within this many days count as "book soon". */
-export const BOOK_SOON_DAYS = 14;
+const BOOK_SOON_DAYS = 14;
 
 export type VendorState = 'booked' | 'not-needed' | 'overdue' | 'book-soon' | 'open';
 
+/** Booked, not needed, overdue, book soon (within two weeks) or open. */
 export function vendorState(vendor: Pick<Vendor, 'status' | 'bookBy'>, today: string): VendorState {
   if (vendor.status === 'booked') return 'booked';
   if (vendor.status === 'not-needed') return 'not-needed';
@@ -24,6 +16,7 @@ export function vendorState(vendor: Pick<Vendor, 'status' | 'bookBy'>, today: st
   return 'open';
 }
 
+/** Booked vendors out of those still needed; never divides by zero. */
 export function vendorProgress(vendors: readonly Pick<Vendor, 'status'>[]): {
   booked: number;
   needed: number;

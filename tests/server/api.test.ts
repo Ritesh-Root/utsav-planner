@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createPlanner } from '../../src/server/ai/planner.js';
 import { createApp } from '../../src/server/app.js';
-import { silentLogger } from '../../src/server/logger.js';
+import { silentLogger } from '../fixtures/logger.js';
 import { toRefineContext } from '../../src/shared/plan.js';
 import { PlanSchema } from '../../src/shared/schemas.js';
 import { FakeAi, aiPlanFor, reply } from '../fixtures/ai.js';
@@ -92,7 +92,7 @@ describe('POST /api/refine', () => {
     const ai = new FakeAi(reply({ message: 'Added it.', ideas: aiPlanFor(birthdayBrief).ideas }));
     const res = await request(appWith(ai)).post('/api/refine').send(body).expect(200);
     expect(res.body.result.message).toBe('Added it.');
-    expect(res.body.result.sections.ideas.length).toBeGreaterThan(3);
+    expect(res.body.result.sections.ideas).toHaveLength(aiPlanFor(birthdayBrief).ideas.length);
   });
 
   it('fails visibly, with Retry-After, when AI is unavailable', async () => {
@@ -164,6 +164,15 @@ describe('request hygiene', () => {
     const limited = await request(app).post('/api/plan').send(planBody).expect(429);
     expect(limited.body.error.code).toBe('RATE_LIMITED');
     expect(limited.headers['retry-after']).toBe('60');
+  });
+
+  it('keys limits on the address the trusted proxy saw, so spoofed headers do not help', async () => {
+    const app = appWith(undefined, 2);
+    const send = (forwarded: string) =>
+      request(app).post('/api/plan').set('X-Forwarded-For', forwarded).send(planBody);
+    await send('1.1.1.1, 203.0.113.9').expect(200);
+    await send('2.2.2.2, 203.0.113.9').expect(200);
+    await send('3.3.3.3, 203.0.113.9').expect(429);
   });
 
   it('returns JSON 404s for unknown API routes', async () => {

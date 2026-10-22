@@ -9,6 +9,7 @@ export interface DailyBudget {
   used(): number;
 }
 
+/** A per-instance allowance of model calls that resets at midnight UTC. */
 export function createDailyBudget(cap: number, now: () => Date): DailyBudget {
   let day = '';
   let count = 0;
@@ -40,6 +41,10 @@ export interface CircuitBreaker {
   recordFailure(): void;
 }
 
+/**
+ * Opens after `threshold` consecutive service failures and stays open for
+ * `coolDownMs`, then lets one trial call through.
+ */
 export function createCircuitBreaker(options: {
   threshold: number;
   coolDownMs: number;

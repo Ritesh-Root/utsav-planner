@@ -20,7 +20,12 @@ export interface AiRequest {
 
 export interface AiResponse {
   text: string;
-  usage: { promptTokens: number; outputTokens: number };
+  usage: {
+    promptTokens: number;
+    outputTokens: number;
+    thoughtTokens: number;
+    cachedTokens: number;
+  };
 }
 
 export type AiErrorKind =
@@ -76,6 +81,7 @@ const SAFETY_SETTINGS = [
   HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
 ].map((category) => ({ category, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE }));
 
+/** Classify any failure from the SDK so the planner knows whether to retry. */
 export function toAiError(error: unknown, signal?: AbortSignal): AiError {
   if (error instanceof AiError) return error;
   if (signal?.aborted || (error instanceof Error && /abort|timeout/i.test(error.name))) {
@@ -136,6 +142,8 @@ export function createGeminiClient(options: {
           usage: {
             promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
             outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+            thoughtTokens: response.usageMetadata?.thoughtsTokenCount ?? 0,
+            cachedTokens: response.usageMetadata?.cachedContentTokenCount ?? 0,
           },
         };
       } catch (error) {

@@ -49,12 +49,17 @@ describe('createGeminiClient', () => {
     generateContent.mockResolvedValue({
       text: '{"ok":true}',
       candidates: [{ finishReason: 'STOP' }],
-      usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 20 },
+      usageMetadata: {
+        promptTokenCount: 10,
+        candidatesTokenCount: 20,
+        thoughtsTokenCount: 3,
+        cachedContentTokenCount: 4,
+      },
     });
     const response = await client().generate(request);
     expect(response).toEqual({
       text: '{"ok":true}',
-      usage: { promptTokens: 10, outputTokens: 20 },
+      usage: { promptTokens: 10, outputTokens: 20, thoughtTokens: 3, cachedTokens: 4 },
     });
     const call = generateContent.mock.calls[0]?.[0] as {
       model: string;

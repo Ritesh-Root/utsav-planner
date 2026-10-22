@@ -1,23 +1,36 @@
+import type { SubmitEvent } from 'react';
 import { useId, useMemo, useState } from 'react';
 
 import { projectGuests, summarizeBudget } from '../../shared/budget.js';
 import { LIMITS } from '../../shared/limits.js';
-import { formatMoney } from '../../shared/money.js';
-import { applyGuestChange, setLineActual, setLineAmount, unlockLine } from '../../shared/plan.js';
+import type { Currency } from '../../shared/money.js';
+import { formatMoney, parseWholeNumber } from '../../shared/money.js';
+import {
+  addBudgetLine,
+  applyGuestChange,
+  randomId,
+  removeBudgetLine,
+  setLineActual,
+  setLineAmount,
+  unlockLine,
+} from '../../shared/plan.js';
 import { committedByKey } from '../../shared/vendors.js';
 import { AmountInput, Money, Pill, Track } from '../components/Display';
 import type { PanelProps } from './types';
+
+/** A formatter for one currency, shared by everything on this tab. */
+const moneyIn = (currency: Currency) => (value: number) => formatMoney(value, currency);
 
 function GuestWhatIf({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   const { brief } = plan;
   const [text, setText] = useState(String(brief.guests));
   const inputId = useId();
-  const guests = Number(text.replace(/[\s,]/g, ''));
-  const valid =
-    Number.isInteger(guests) && guests >= LIMITS.guestsMin && guests <= LIMITS.guestsMax;
+  const parsed = parseWholeNumber(text);
+  const guests = parsed ?? 0;
+  const valid = parsed !== null && guests >= LIMITS.guestsMin && guests <= LIMITS.guestsMax;
   const projection = valid ? projectGuests(plan.budget, brief.guests, guests, brief.budget) : null;
   const changed = valid && guests !== brief.guests;
-  const money = (value: number) => formatMoney(value, brief.currency);
+  const money = moneyIn(brief.currency);
 
   return (
     <section className="panel span-4" aria-labelledby="whatif-title">
@@ -87,6 +100,78 @@ function GuestWhatIf({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   );
 }
 
+function AddLineForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
+  const [category, setCategory] = useState('');
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState('');
+  const id = useId();
+
+  const submit = (event: SubmitEvent) => {
+    event.preventDefault();
+    const value = parseWholeNumber(amount);
+    if (category.trim() === '' || value === null || value > LIMITS.budgetMax) {
+      setError('Name the line and give a whole-number amount.');
+      return;
+    }
+    setError('');
+    update(addBudgetLine(plan, { category, amount: value }, randomId, new Date()), {
+      undoable: true,
+      announcement: `Added ${category.trim()}; other lines rebalanced`,
+    });
+    setCategory('');
+    setAmount('');
+  };
+
+  return (
+    <form className="inner form" onSubmit={submit} noValidate aria-labelledby={`${id}-title`}>
+      <h3 id={`${id}-title`} className="panel-title">
+        Add a budget line
+      </h3>
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="field-row">
+        <div className="field">
+          <label className="label" htmlFor={`${id}-category`}>
+            What it is for
+          </label>
+          <input
+            id={`${id}-category`}
+            className="input"
+            maxLength={LIMITS.shortText}
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+            }}
+          />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor={`${id}-amount`}>
+            Amount ({plan.brief.currency})
+          </label>
+          <input
+            id={`${id}-amount`}
+            className="input"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value);
+            }}
+          />
+        </div>
+      </div>
+      <div>
+        <button type="submit" className="btn btn-secondary btn-small">
+          Add line
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Planned and spent money by category, with exact rebalancing and a guest-count what-if. */
 export default function BudgetPanel({ plan, update, refine }: PanelProps) {
   const { brief } = plan;
   const summary = useMemo(
@@ -94,7 +179,7 @@ export default function BudgetPanel({ plan, update, refine }: PanelProps) {
     [plan.budget, brief],
   );
   const committed = useMemo(() => committedByKey(plan.vendors), [plan.vendors]);
-  const money = (value: number) => formatMoney(value, brief.currency);
+  const money = moneyIn(brief.currency);
   const now = () => new Date();
 
   return (
@@ -164,6 +249,23 @@ export default function BudgetPanel({ plan, update, refine }: PanelProps) {
                         {booked > 0 && (
                           <span className="row-sub">{money(booked)} in booked vendor quotes</span>
                         )}
+                        {plan.budget.length > 1 && (
+                          <span className="row-actions">
+                            <button
+                              type="button"
+                              className="link-button quiet-link"
+                              aria-label={`Remove: ${line.category}`}
+                              onClick={() => {
+                                update(removeBudgetLine(plan, line.id, now()), {
+                                  undoable: true,
+                                  announcement: `Removed ${line.category}; other lines rebalanced`,
+                                });
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="num" data-label="Planned">
@@ -172,7 +274,7 @@ export default function BudgetPanel({ plan, update, refine }: PanelProps) {
                           <button
                             type="button"
                             className="link-button"
-                            aria-label={`Let Utsav set ${line.category} again`}
+                            aria-label={`Reset: ${line.category}`}
                             onClick={() => {
                               update(unlockLine(plan, line.id, now()), { undoable: true });
                             }}
@@ -205,9 +307,16 @@ export default function BudgetPanel({ plan, update, refine }: PanelProps) {
                       />
                     </td>
                     <td className="num" data-label="Typical range (AI estimate)">
-                      <span className="unit">
-                        {money(line.estLow)}–{money(line.estHigh)}
-                      </span>
+                      {line.estHigh > 0 ? (
+                        <span className="unit">
+                          {money(line.estLow)}–{money(line.estHigh)}
+                        </span>
+                      ) : (
+                        <span className="unit">
+                          <span aria-hidden="true">—</span>
+                          <span className="sr-only">No estimate</span>
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -227,6 +336,7 @@ export default function BudgetPanel({ plan, update, refine }: PanelProps) {
             </tfoot>
           </table>
         </div>
+        <AddLineForm plan={plan} update={update} />
       </section>
       <GuestWhatIf key={`${brief.guests}-${brief.budget}`} plan={plan} update={update} />
     </div>

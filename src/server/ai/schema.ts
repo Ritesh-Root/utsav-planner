@@ -35,6 +35,7 @@ export const SUPPORTED_KEYWORDS: ReadonlySet<string> = new Set([
 /** Bounds this large are zod's integer defaults and only add noise to the schema. */
 const MEANINGLESS_BOUND = 1e12;
 
+/** Strip a JSON Schema down to the keywords listed above, recursively. */
 export function toGeminiSchema(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(toGeminiSchema);
   if (typeof node !== 'object' || node === null) return node;

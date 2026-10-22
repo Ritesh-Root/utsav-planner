@@ -1,24 +1,32 @@
-import { useId } from 'react';
+import type { SubmitEvent } from 'react';
+import { useId, useState } from 'react';
 
-import { formatDate } from '../../shared/dates.js';
+import { VENDOR_STATUSES } from '../../shared/constants.js';
+import { addDays, formatDate } from '../../shared/dates.js';
 import { LIMITS } from '../../shared/limits.js';
 import { googleMapsSearchUrl } from '../../shared/links.js';
+import type { VendorChanges } from '../../shared/plan.js';
+import { addCustomVendor, randomId, removeVendor, updateVendor } from '../../shared/plan.js';
 import type { Vendor, VendorStatus } from '../../shared/schemas.js';
-import { VENDOR_STATUSES } from '../../shared/schemas.js';
-import { VENDOR_STATUS_LABELS, vendorProgress, vendorState } from '../../shared/vendors.js';
+import { vendorProgress, vendorState } from '../../shared/vendors.js';
 import { AmountInput, Pill, Track } from '../components/Display';
+import { VENDOR_STATUS_LABELS } from '../labels';
 import type { PanelProps } from './types';
 
 function VendorItem({
   vendor,
-  plan,
+  location,
+  currency,
   today,
   onChange,
+  onRemove,
 }: {
   vendor: Vendor;
-  plan: PanelProps['plan'];
+  location: string;
+  currency: string;
   today: string;
-  onChange: (changes: Partial<Vendor>, announcement?: string) => void;
+  onChange: (changes: VendorChanges, announcement?: string) => void;
+  onRemove: () => void;
 }) {
   const id = useId();
   const state = vendorState(vendor, today);
@@ -90,18 +98,20 @@ function VendorItem({
           Questions to ask and your notes<span className="sr-only"> for {vendor.category}</span>
         </summary>
         <div className="vendor-body">
-          <ul className="questions">
-            {vendor.questions.map((question) => (
-              <li key={question}>{question}</li>
-            ))}
-          </ul>
+          {vendor.questions.length > 0 && (
+            <ul className="questions">
+              {vendor.questions.map((question) => (
+                <li key={question}>{question}</li>
+              ))}
+            </ul>
+          )}
           <p>
             <a
-              href={googleMapsSearchUrl(vendor.category, plan.brief.location)}
+              href={googleMapsSearchUrl(vendor.category, location)}
               target="_blank"
               rel="noopener noreferrer"
             >
-              Find {vendor.category.toLowerCase()} near {plan.brief.location} on Google Maps
+              Find {vendor.category.toLowerCase()} near {location} on Google Maps
               <span className="sr-only"> (opens in a new tab)</span>
             </a>
           </p>
@@ -109,13 +119,13 @@ function VendorItem({
             {text('contactName', 'Vendor name', LIMITS.vendorFieldMax)}
             {text('contact', 'Phone or email', LIMITS.vendorFieldMax)}
             <div className="field">
-              <span className="label" id={`${id}-quote-label`}>
-                Quote ({plan.brief.currency})
-              </span>
+              <label className="label" htmlFor={`${id}-quote`}>
+                Quote ({currency})
+              </label>
               <AmountInput
+                id={`${id}-quote`}
                 value={vendor.quote}
                 max={LIMITS.budgetMax}
-                label={`Quote from ${vendor.category}`}
                 onCommit={(quote) => {
                   onChange({ quote });
                 }}
@@ -126,18 +136,104 @@ function VendorItem({
           <p className="hint">
             Names, contacts, quotes and notes stay on this device and are never sent to the AI.
           </p>
+          <div>
+            <button
+              type="button"
+              className="btn btn-quiet btn-small"
+              aria-label={`Remove: ${vendor.category}`}
+              onClick={onRemove}
+            >
+              Remove
+            </button>
+          </div>
         </div>
       </details>
     </li>
   );
 }
 
+function AddVendorForm({ plan, today, update }: Pick<PanelProps, 'plan' | 'today' | 'update'>) {
+  const [category, setCategory] = useState('');
+  const [bookBy, setBookBy] = useState(() => {
+    const twoWeeks = addDays(today, 14);
+    return twoWeeks < plan.brief.date ? twoWeeks : today;
+  });
+  const [error, setError] = useState('');
+  const id = useId();
+
+  const submit = (event: SubmitEvent) => {
+    event.preventDefault();
+    if (category.trim() === '') {
+      setError('Say which kind of vendor, for example "Live band".');
+      return;
+    }
+    setError('');
+    update(
+      addCustomVendor(plan, { category, budgetKey: 'misc', bookBy }, randomId, today, new Date()),
+      { undoable: true, announcement: `Added ${category.trim()}` },
+    );
+    setCategory('');
+  };
+
+  return (
+    <form className="inner form" onSubmit={submit} noValidate aria-labelledby={`${id}-title`}>
+      <h3 id={`${id}-title`} className="panel-title">
+        Add a vendor you need
+      </h3>
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="field-row">
+        <div className="field">
+          <label className="label" htmlFor={`${id}-category`}>
+            Kind of vendor
+          </label>
+          <input
+            id={`${id}-category`}
+            className="input"
+            maxLength={LIMITS.shortText}
+            value={category}
+            aria-invalid={error !== ''}
+            onChange={(e) => {
+              setCategory(e.target.value);
+            }}
+          />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor={`${id}-book-by`}>
+            Book by
+          </label>
+          <input
+            id={`${id}-book-by`}
+            className="input"
+            type="date"
+            min={today}
+            max={plan.brief.date}
+            value={bookBy}
+            onChange={(e) => {
+              setBookBy(e.target.value);
+            }}
+          />
+        </div>
+      </div>
+      <div>
+        <button type="submit" className="btn btn-secondary btn-small">
+          Add vendor
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Which vendors to book, by when and what to ask, with the user's own notes kept local. */
 export default function VendorsPanel({ plan, today, update, refine }: PanelProps) {
   const progress = vendorProgress(plan.vendors);
 
-  const change = (vendorId: string) => (changes: Partial<Vendor>, announcement?: string) => {
+  const change = (vendorId: string) => (changes: VendorChanges, announcement?: string) => {
     update(
-      { ...plan, vendors: plan.vendors.map((v) => (v.id === vendorId ? { ...v, ...changes } : v)) },
+      updateVendor(plan, vendorId, changes, new Date()),
       announcement ? { undoable: true, announcement } : {},
     );
   };
@@ -167,17 +263,29 @@ export default function VendorsPanel({ plan, today, update, refine }: PanelProps
           max={progress.needed}
           label={`${progress.booked} of ${progress.needed} vendors booked`}
         />
-        <ul className="rows vendors">
-          {plan.vendors.map((vendor) => (
-            <VendorItem
-              key={vendor.id}
-              vendor={vendor}
-              plan={plan}
-              today={today}
-              onChange={change(vendor.id)}
-            />
-          ))}
-        </ul>
+        {plan.vendors.length === 0 ? (
+          <p className="empty">No vendors on the checklist. Add one below.</p>
+        ) : (
+          <ul className="rows vendors">
+            {plan.vendors.map((vendor) => (
+              <VendorItem
+                key={vendor.id}
+                vendor={vendor}
+                location={plan.brief.location}
+                currency={plan.brief.currency}
+                today={today}
+                onChange={change(vendor.id)}
+                onRemove={() => {
+                  update(removeVendor(plan, vendor.id, new Date()), {
+                    undoable: true,
+                    announcement: `Removed ${vendor.category}`,
+                  });
+                }}
+              />
+            ))}
+          </ul>
+        )}
+        <AddVendorForm plan={plan} today={today} update={update} />
       </section>
       <section className="panel span-4" aria-labelledby="vendors-about">
         <h2 id="vendors-about" className="panel-title">

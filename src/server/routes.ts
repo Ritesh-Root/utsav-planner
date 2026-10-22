@@ -38,6 +38,7 @@ export interface RouteDeps {
   now: () => Date;
 }
 
+/** The JSON API: health, plan and refine. Validation errors become 400s with field paths. */
 export function createApiRouter({ planner, version, aiLimiter, now }: RouteDeps): Router {
   const router = Router();
 

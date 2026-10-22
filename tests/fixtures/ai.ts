@@ -44,5 +44,5 @@ export class FakeAi implements AiClient {
 
 export const reply = (value: unknown): AiResponse => ({
   text: typeof value === 'string' ? value : JSON.stringify(value),
-  usage: { promptTokens: 100, outputTokens: 200 },
+  usage: { promptTokens: 100, outputTokens: 200, thoughtTokens: 0, cachedTokens: 0 },
 });

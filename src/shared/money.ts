@@ -1,3 +1,5 @@
+import { LIMITS } from './limits.js';
+
 export const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'CAD', 'AUD'] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
@@ -17,6 +19,20 @@ export function formatMoney(amount: number, currency: Currency, locale = 'en-IN'
     formatters.set(key, formatter);
   }
   return formatter.format(Math.round(amount));
+}
+
+/**
+ * A whole number typed by a person, forgiving spaces and thousands separators
+ * ("2,50,000", "25 000"). Null for anything else, including decimals.
+ */
+export function parseWholeNumber(text: string): number | null {
+  const cleaned = text.replace(/[\s,_]/g, '');
+  return /^\d+$/.test(cleaned) ? Number(cleaned) : null;
+}
+
+/** The largest AI cost estimate worth keeping for a given total budget. */
+export function estimateCap(budget: number): number {
+  return budget * LIMITS.estimateCapMultiple;
 }
 
 /** Clamp to a whole, non-negative amount. */

@@ -1,3 +1,9 @@
+import birthday192 from '../assets/birthday-192.webp';
+import birthday96 from '../assets/birthday-96.webp';
+import community192 from '../assets/community-192.webp';
+import community96 from '../assets/community-96.webp';
+import wedding192 from '../assets/wedding-192.webp';
+import wedding96 from '../assets/wedding-96.webp';
 import { formatDate } from '../../shared/dates.js';
 import { formatMoney } from '../../shared/money.js';
 import { presets } from '../../shared/presets.js';
@@ -9,14 +15,21 @@ import { EVENT_TYPE_LABELS } from '../labels';
 import { hrefFor } from '../router';
 import { usePlanStore } from '../state/store';
 
+// Illustrations made with Google Antigravity; fingerprinted by Vite, so cached for a year.
 const PICTURES = {
-  wedding: { src: '/img/wedding.webp', alt: 'A wedding mandap hung with marigold garlands' },
+  wedding: {
+    src: wedding96,
+    srcSet: `${wedding96} 1x, ${wedding192} 2x`,
+    alt: 'A wedding mandap hung with marigold garlands',
+  },
   birthday: {
-    src: '/img/birthday.webp',
+    src: birthday96,
+    srcSet: `${birthday96} 1x, ${birthday192} 2x`,
     alt: 'A birthday cake with seven candles among planets and stars',
   },
   community: {
-    src: '/img/community.webp',
+    src: community96,
+    srcSet: `${community96} 1x, ${community192} 2x`,
     alt: 'Market stalls under hanging lanterns, with diyas in front',
   },
 } as const;
@@ -27,9 +40,10 @@ function daysLabel(days: number): string {
   return `${days} ${days === 1 ? 'day' : 'days'}`;
 }
 
+/** Start a plan from a sample or from scratch, and reopen saved plans. */
 export default function HomeView() {
   const today = useToday();
-  const { plans } = usePlanStore();
+  const { plans, ready } = usePlanStore();
   const heading = usePageFocus<HTMLHeadingElement>('home');
   useDocumentTitle('Plan a celebration');
 
@@ -57,6 +71,7 @@ export default function HomeView() {
               <img
                 className="picture"
                 src={PICTURES[preset.id].src}
+                srcSet={PICTURES[preset.id].srcSet}
                 alt={PICTURES[preset.id].alt}
                 width="96"
                 height="96"
@@ -94,7 +109,11 @@ export default function HomeView() {
         <h2 id="plans-title" className="section-title">
           Your plans
         </h2>
-        {plans.length === 0 ? (
+        {!ready ? (
+          <p className="meta" role="status">
+            Loading your plans…
+          </p>
+        ) : plans.length === 0 ? (
           <p className="empty">
             No plans yet. Start from a sample above or make your own; plans are saved in this
             browser only.

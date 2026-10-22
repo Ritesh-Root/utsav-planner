@@ -13,7 +13,7 @@ export interface Insight {
 }
 
 /** Events this close switch the assistant into last-minute mode. */
-export const LAST_MINUTE_DAYS = 14;
+const LAST_MINUTE_DAYS = 14;
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 

@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "tsx watch --env-file-if-exists=.env src/server/main.ts",
-    "build": "vite build && tsc -p tsconfig.build.json",
+    "build": "vite build && node scripts/precompress.mjs && tsc -p tsconfig.build.json",
     "start": "node dist/node/server/main.js",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "node scripts/e2e.mjs",
+    "test:e2e:install": "playwright-core install chromium",
     "smoke:ai": "tsx scripts/smoke-ai.ts",
     "smoke:live": "node scripts/smoke-live.mjs",
     "budget:bundle": "node scripts/bundle-budget.mjs",

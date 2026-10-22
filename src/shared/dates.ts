@@ -1,3 +1,5 @@
+import { LIMITS } from './limits.js';
+
 /**
  * Calendar maths on `YYYY-MM-DD` strings. Everything works in whole UTC days so
  * results never depend on the machine's time zone or daylight-saving rules.
@@ -90,7 +92,7 @@ export function formatDate(iso: string, locale = 'en-IN'): string {
 
 /** "18:30" from minutes after midnight. */
 export function formatMinutes(minutes: number): string {
-  const clamped = Math.min(Math.max(Math.round(minutes), 0), 24 * 60 - 1);
+  const clamped = Math.min(Math.max(Math.round(minutes), 0), LIMITS.dayMinutesMax);
   const hours = String(Math.floor(clamped / 60)).padStart(2, '0');
   const mins = String(clamped % 60).padStart(2, '0');
   return `${hours}:${mins}`;

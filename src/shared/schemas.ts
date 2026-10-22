@@ -1,79 +1,27 @@
 import { z } from 'zod';
 
+import {
+  BUDGET_KEYS,
+  COST_TIERS,
+  DIETARY,
+  EVENT_TYPES,
+  IDEA_CATEGORIES,
+  PLAN_VERSION,
+  PRIORITIES,
+  REFINE_SCOPES,
+  TASK_PRIORITIES,
+  VENDOR_STATUSES,
+  VENUE_PREFERENCES,
+} from './constants.js';
 import { isISODate } from './dates.js';
-import { LIMITS } from './limits.js';
+import { BASIS_POINTS, LIMITS } from './limits.js';
 import { CURRENCIES } from './money.js';
 
-export const EVENT_TYPES = ['wedding', 'birthday', 'community'] as const;
-export const VENUE_PREFERENCES = ['indoor', 'outdoor', 'either'] as const;
-export const PRIORITIES = [
-  'food',
-  'decor',
-  'photography',
-  'entertainment',
-  'guest-comfort',
-  'saving-money',
-  'sustainability',
-  'traditions',
-] as const;
-export const DIETARY = ['vegetarian', 'vegan', 'jain', 'halal', 'gluten-free', 'nut-free'] as const;
-export const BUDGET_KEYS = [
-  'venue',
-  'catering',
-  'decor',
-  'photography',
-  'entertainment',
-  'attire',
-  'beauty',
-  'invitations',
-  'gifts',
-  'transport',
-  'accommodation',
-  'rituals',
-  'cake',
-  'rentals',
-  'sound-light',
-  'permits',
-  'safety',
-  'volunteers',
-  'marketing',
-  'cleanup',
-  'misc',
-  'contingency',
-] as const;
-export const TASK_PRIORITIES = ['high', 'medium', 'low'] as const;
-export const VENDOR_STATUSES = [
-  'not-started',
-  'researching',
-  'contacted',
-  'quoted',
-  'booked',
-  'not-needed',
-] as const;
-export const IDEA_CATEGORIES = [
-  'theme',
-  'decor',
-  'food',
-  'activity',
-  'culture',
-  'accessibility',
-  'sustainability',
-  'keepsake',
-] as const;
-export const COST_TIERS = ['low', 'medium', 'high'] as const;
-export const REFINE_SCOPES = ['all', 'budget', 'timeline', 'vendors', 'ideas', 'dayOf'] as const;
+export * from './constants.js';
 
-export type EventType = (typeof EVENT_TYPES)[number];
-export type VenuePreference = (typeof VENUE_PREFERENCES)[number];
-export type Priority = (typeof PRIORITIES)[number];
-export type Dietary = (typeof DIETARY)[number];
-export type BudgetKey = (typeof BUDGET_KEYS)[number];
-export type TaskPriority = (typeof TASK_PRIORITIES)[number];
-export type VendorStatus = (typeof VENDOR_STATUSES)[number];
-export type IdeaCategory = (typeof IDEA_CATEGORIES)[number];
-export type CostTier = (typeof COST_TIERS)[number];
-export type RefineScope = (typeof REFINE_SCOPES)[number];
-export type PlanSection = Exclude<RefineScope, 'all'>;
+// zod normally probes for `new Function` support, which the strict CSP blocks in
+// the browser; jitless mode skips that probe there and keeps the JIT on Node.
+z.config({ jitless: 'document' in globalThis });
 
 export const IsoDateSchema = z
   .string()
@@ -85,39 +33,40 @@ const uniqueList = <T extends string>(values: readonly [T, ...T[]], max: number)
     .max(max)
     .refine((list) => new Set(list).size === list.length, { message: 'Remove duplicates' });
 
+/** The fields of a brief, before cross-field rules. */
+const BriefShape = z.strictObject({
+  type: z.enum(EVENT_TYPES),
+  title: z.string().trim().min(1, 'Give the event a name').max(LIMITS.titleMax),
+  date: IsoDateSchema,
+  location: z.string().trim().min(1, 'Add a city or area').max(LIMITS.locationMax),
+  guests: z.number().int().min(LIMITS.guestsMin).max(LIMITS.guestsMax),
+  budget: z.number().int().min(1, 'Enter a budget above zero').max(LIMITS.budgetMax),
+  currency: z.enum(CURRENCIES),
+  venue: z.enum(VENUE_PREFERENCES),
+  style: z.string().trim().max(LIMITS.styleMax),
+  priorities: uniqueList(PRIORITIES, LIMITS.prioritiesMax),
+  dietary: uniqueList(DIETARY, LIMITS.dietaryMax),
+  days: z.number().int().min(1).max(LIMITS.weddingDaysMax),
+  honoreeAge: z.number().int().min(0).max(LIMITS.honoreeAgeMax).nullable(),
+  notes: z.string().trim().max(LIMITS.notesMax),
+});
+
 /** What the user tells us about their event. */
-export const BriefSchema = z
-  .strictObject({
-    type: z.enum(EVENT_TYPES),
-    title: z.string().trim().min(1, 'Give the event a name').max(LIMITS.titleMax),
-    date: IsoDateSchema,
-    location: z.string().trim().min(1, 'Add a city or area').max(LIMITS.locationMax),
-    guests: z.number().int().min(LIMITS.guestsMin).max(LIMITS.guestsMax),
-    budget: z.number().int().min(1, 'Enter a budget above zero').max(LIMITS.budgetMax),
-    currency: z.enum(CURRENCIES),
-    venue: z.enum(VENUE_PREFERENCES),
-    style: z.string().trim().max(LIMITS.styleMax),
-    priorities: uniqueList(PRIORITIES, LIMITS.prioritiesMax),
-    dietary: uniqueList(DIETARY, LIMITS.dietaryMax),
-    days: z.number().int().min(1).max(LIMITS.weddingDaysMax),
-    honoreeAge: z.number().int().min(0).max(LIMITS.honoreeAgeMax).nullable(),
-    notes: z.string().trim().max(LIMITS.notesMax),
-  })
-  .refine((brief) => brief.type === 'birthday' || brief.honoreeAge === null, {
-    message: 'Age only applies to birthdays',
-    path: ['honoreeAge'],
-  });
+export const BriefSchema = BriefShape.refine(
+  (brief) => brief.type === 'birthday' || brief.honoreeAge === null,
+  { message: 'Age only applies to birthdays', path: ['honoreeAge'] },
+);
 export type Brief = z.infer<typeof BriefSchema>;
 
-/** Fields a refinement may change in the brief. */
-export const BriefPatchSchema = z.strictObject({
-  guests: z.number().int().min(LIMITS.guestsMin).max(LIMITS.guestsMax).optional(),
-  budget: z.number().int().min(1).max(LIMITS.budgetMax).optional(),
-  date: IsoDateSchema.optional(),
-  location: z.string().trim().min(1).max(LIMITS.locationMax).optional(),
-  style: z.string().trim().max(LIMITS.styleMax).optional(),
-  days: z.number().int().min(1).max(LIMITS.weddingDaysMax).optional(),
-});
+/** Fields a refinement may change in the brief, with the same rules as the brief. */
+export const BriefPatchSchema = BriefShape.pick({
+  guests: true,
+  budget: true,
+  date: true,
+  location: true,
+  style: true,
+  days: true,
+}).partial();
 export type BriefPatch = z.infer<typeof BriefPatchSchema>;
 
 // ---------------------------------------------------------------------------
@@ -186,7 +135,7 @@ export const AiDayOfSchema = z.object({
   startMinute: z
     .number()
     .int()
-    .meta({ minimum: 0, maximum: 1439, description: 'Minutes after midnight' }),
+    .meta({ minimum: 0, maximum: LIMITS.dayMinutesMax, description: 'Minutes after midnight' }),
   title: text('What happens'),
 });
 
@@ -244,7 +193,7 @@ export type AiRefine = z.infer<typeof AiRefineSchema>;
 // file can never crash the app.
 // ---------------------------------------------------------------------------
 
-const id = z.string().min(1).max(64);
+const id = z.string().min(1).max(LIMITS.idMax);
 const amount = z
   .number()
   .int()
@@ -256,7 +205,7 @@ export const BudgetLineSchema = z.strictObject({
   id,
   key: z.enum(BUDGET_KEYS),
   category: storedText(LIMITS.shortText),
-  shareBp: z.number().int().min(0).max(10_000),
+  shareBp: z.number().int().min(0).max(BASIS_POINTS),
   perGuest: z.boolean(),
   rationale: storedText(LIMITS.mediumText),
   estLow: amount,
@@ -305,11 +254,9 @@ export const IdeaSchema = z.strictObject({
 export const DayOfItemSchema = z.strictObject({
   id,
   day: z.number().int().min(1).max(LIMITS.weddingDaysMax),
-  startMinute: z.number().int().min(0).max(1439),
+  startMinute: z.number().int().min(0).max(LIMITS.dayMinutesMax),
   title: storedText(LIMITS.shortText),
 });
-
-export const PLAN_VERSION = 1;
 
 export const PlanSchema = z.strictObject({
   version: z.literal(PLAN_VERSION),
@@ -320,7 +267,7 @@ export const PlanSchema = z.strictObject({
   brief: BriefSchema,
   source: z.enum(['ai', 'template']),
   fallbackReason: storedText(LIMITS.mediumText).nullable(),
-  model: storedText(64).nullable(),
+  model: storedText(LIMITS.idMax).nullable(),
   title: storedText(LIMITS.shortText),
   summary: storedText(LIMITS.longText),
   assumptions: z.array(storedText(LIMITS.mediumText)).max(LIMITS.assumptionsMax),

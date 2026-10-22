@@ -3,14 +3,15 @@ import { useEffect, useRef, useState } from 'react';
 import { presets } from '../../shared/presets.js';
 import type { Brief, EventType } from '../../shared/schemas.js';
 import { ApiError, requestPlan } from '../api';
-import type { BriefDraft, FieldErrors } from '../briefForm';
-import { draftFromBrief, emptyDraft, errorsFromServer, toBrief } from '../briefForm';
+import type { BriefDraft, FieldErrors } from '../briefDraft';
+import { draftFromBrief, emptyDraft, errorsFromServer, toBrief } from '../briefDraft';
 import { BriefForm } from '../components/BriefForm';
 import { useDocumentTitle, usePageFocus, useToday } from '../hooks';
 import { navigate } from '../router';
 import { useAnnounce } from '../state/announcer';
 import { usePlanStore } from '../state/store';
 
+/** The brief form, then progress while Gemini drafts, then the new plan (or an offline one). */
 export default function NewPlanView({ preset }: { preset: EventType | null }) {
   const today = useToday();
   const { savePlan } = usePlanStore();
@@ -41,6 +42,8 @@ export default function NewPlanView({ preset }: { preset: EventType | null }) {
     setWorking(brief);
     announce(`Planning ${brief.title}. This usually takes about ten seconds.`);
     controller.current = new AbortController();
+    // Fetch the workspace's code while Gemini works, so the plan opens at once.
+    void import('./PlanView');
     try {
       const { plan } = await requestPlan(brief, today, controller.current.signal);
       savePlan(plan);

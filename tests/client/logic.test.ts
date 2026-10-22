@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError, requestPlan } from '../../src/client/api';
-import { draftFromBrief, emptyDraft, errorsFromServer, toBrief } from '../../src/client/briefForm';
+import { draftFromBrief, emptyDraft, errorsFromServer, toBrief } from '../../src/client/briefDraft';
 import { buildOfflinePlan } from '../../src/client/offline';
 import { hrefFor, parseRoute } from '../../src/client/router';
 import { loadSettings, resolveTheme, saveSettings } from '../../src/client/settings';
@@ -109,7 +109,10 @@ describe('storage and settings', () => {
 
   it('checks imported plan files before trusting them', () => {
     const plan = templatePlan(birthdayBrief);
-    expect(parsePlanFile(JSON.stringify(plan))).toEqual({ ok: true, plan });
+    expect(parsePlanFile(JSON.stringify(plan))).toEqual({ ok: true, plans: [plan] });
+    // "Download all plans" writes a list; it must open again.
+    expect(parsePlanFile(JSON.stringify([plan, plan]))).toEqual({ ok: true, plans: [plan, plan] });
+    expect(parsePlanFile('[]')).toMatchObject({ ok: false });
     expect(parsePlanFile('not json')).toMatchObject({ ok: false });
     expect(parsePlanFile(JSON.stringify({ ...plan, version: 9 }))).toMatchObject({ ok: false });
     expect(parsePlanFile('x'.repeat(300_000))).toEqual({
@@ -137,7 +140,10 @@ describe('plan store', () => {
   const edited = { ...plan, title: 'Edited' };
 
   it('saves, undoes and removes plans', () => {
-    let state = storeReducer({ plans: [], history: {} }, { type: 'save', plan, undoable: true });
+    let state = storeReducer(
+      { plans: [], history: {}, ready: true },
+      { type: 'save', plan, undoable: true },
+    );
     expect(state.history[plan.id]).toBeUndefined();
     state = storeReducer(state, { type: 'save', plan: edited, undoable: true });
     expect(state.plans[0]?.title).toBe('Edited');
@@ -150,7 +156,7 @@ describe('plan store', () => {
 
   it('keeps at most 20 undo steps', () => {
     let state = storeReducer(
-      { plans: [plan], history: {} },
+      { plans: [plan], history: {}, ready: true },
       { type: 'replace-all', plans: [plan] },
     );
     for (let i = 0; i < 25; i += 1) {

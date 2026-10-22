@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import type { ZodError } from 'zod';
 
+import { LIMITS } from '../shared/limits.js';
 import type { Logger } from './logger.js';
 
 export interface FieldError {
@@ -21,9 +22,10 @@ export class HttpError extends Error {
   }
 }
 
+/** A 400 that lists the fields to fix, by path, without echoing the input. */
 export function validationError(error: ZodError, message = 'Some details need fixing.'): HttpError {
   return new HttpError(400, 'VALIDATION_FAILED', message, {
-    fields: error.issues.slice(0, 20).map((issue) => ({
+    fields: error.issues.slice(0, LIMITS.fieldErrorsMax).map((issue) => ({
       path: issue.path.join('.'),
       message: issue.message,
     })),

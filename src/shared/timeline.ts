@@ -2,7 +2,7 @@ import { addDays, diffDays } from './dates.js';
 import { LIMITS } from './limits.js';
 import type { Task, TaskPriority } from './schemas.js';
 
-export const PHASES = [
+const PHASES = [
   { id: 'six-months', label: '6+ months before', minDaysBefore: 180 },
   { id: 'three-months', label: '3–6 months before', minDaysBefore: 90 },
   { id: 'one-month', label: '1–3 months before', minDaysBefore: 30 },
@@ -13,6 +13,7 @@ export const PHASES = [
 ] as const;
 export type PhaseId = (typeof PHASES)[number]['id'];
 
+/** Which phase of the countdown a task with this lead time belongs to. */
 export function phaseOf(daysBefore: number): PhaseId {
   const phase = PHASES.find((p) => daysBefore >= p.minDaysBefore);
   return phase ? phase.id : 'after';
@@ -20,6 +21,7 @@ export function phaseOf(daysBefore: number): PhaseId {
 
 export type EventDateIssue = 'past' | 'too-far' | null;
 
+/** Why an event date cannot be planned for, or null when it is fine. */
 export function eventDateIssue(eventDate: string, today: string): EventDateIssue {
   const days = diffDays(today, eventDate);
   if (days < 0) return 'past';
@@ -27,13 +29,30 @@ export function eventDateIssue(eventDate: string, today: string): EventDateIssue
   return null;
 }
 
+/** Whole days from today to the event (negative once it has passed). */
 export function daysUntil(eventDate: string, today: string): number {
   return diffDays(today, eventDate);
 }
 
+/** A lead time rounded and kept inside the range the app supports. */
 export function clampDaysBefore(daysBefore: number): number {
   if (!Number.isFinite(daysBefore)) return 0;
   return Math.min(Math.max(Math.round(daysBefore), LIMITS.daysBeforeMin), LIMITS.daysBeforeMax);
+}
+
+/** A booking lead time: like a task's, but never after the event. */
+export function clampBookDays(bookDaysBefore: number): number {
+  return Math.max(clampDaysBefore(bookDaysBefore), 0);
+}
+
+/** A run-sheet day number between 1 and the event's length. */
+export function clampDay(day: number, days: number): number {
+  return Math.min(Math.max(Math.round(day), 1), days);
+}
+
+/** Minutes after midnight, kept within one day. */
+export function clampStartMinute(minutes: number): number {
+  return Math.min(Math.max(Math.round(minutes), 0), LIMITS.dayMinutesMax);
 }
 
 /**
@@ -55,14 +74,7 @@ export function schedule(
 
 export type TaskStatus = 'done' | 'overdue' | 'do-now' | 'due-soon' | 'upcoming';
 
-export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  done: 'Done',
-  overdue: 'Overdue',
-  'do-now': 'Do now',
-  'due-soon': 'Due this week',
-  upcoming: 'Upcoming',
-};
-
+/** Where a task stands today: done, overdue, do now, due this week or upcoming. */
 export function taskStatus(task: Pick<Task, 'done' | 'due' | 'doNow'>, today: string): TaskStatus {
   if (task.done) return 'done';
   const daysLeft = diffDays(today, task.due);
@@ -74,6 +86,7 @@ export function taskStatus(task: Pick<Task, 'done' | 'due' | 'doNow'>, today: st
 
 const PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
 
+/** Tasks by due date, then priority, then title. */
 export function sortTasks<T extends Pick<Task, 'due' | 'priority' | 'title'>>(
   tasks: readonly T[],
 ): T[] {
@@ -102,6 +115,7 @@ export function groupByPhase<T extends Pick<Task, 'due' | 'priority' | 'title' |
   })).filter((group) => group.tasks.length > 0);
 }
 
+/** Done and total task counts, and the percentage done. */
 export function taskProgress(tasks: readonly Pick<Task, 'done'>[]): {
   done: number;
   total: number;

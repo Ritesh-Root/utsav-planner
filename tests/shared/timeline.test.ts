@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  clampBookDays,
+  clampDay,
   clampDaysBefore,
+  clampStartMinute,
   daysUntil,
   eventDateIssue,
   groupByPhase,
@@ -77,5 +80,18 @@ describe('timeline', () => {
       total: 3,
       percent: 33,
     });
+  });
+});
+
+describe('clamps shared by the AI normaliser and the plan builder', () => {
+  it('keeps run-sheet days, times and booking lead times in range', () => {
+    expect(clampDay(0, 3)).toBe(1);
+    expect(clampDay(2.6, 3)).toBe(3);
+    expect(clampDay(9, 3)).toBe(3);
+    expect(clampStartMinute(-10)).toBe(0);
+    expect(clampStartMinute(5000)).toBe(1439);
+    expect(clampStartMinute(630.4)).toBe(630);
+    expect(clampBookDays(-20)).toBe(0);
+    expect(clampBookDays(45)).toBe(45);
   });
 });

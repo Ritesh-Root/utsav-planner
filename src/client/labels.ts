@@ -6,8 +6,10 @@ import type {
   Priority,
   RefineScope,
   TaskPriority,
+  VendorStatus,
   VenuePreference,
 } from '../shared/schemas.js';
+import type { TaskStatus } from '../shared/timeline.js';
 
 /** Words people see for each value the data uses. */
 export const EVENT_TYPE_LABELS: Record<EventType, string> = {
@@ -97,3 +99,20 @@ export const SUGGESTIONS: Record<RefineScope, string[]> = {
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  done: 'Done',
+  overdue: 'Overdue',
+  'do-now': 'Do now',
+  'due-soon': 'Due this week',
+  upcoming: 'Upcoming',
+};
+
+export const VENDOR_STATUS_LABELS: Record<VendorStatus, string> = {
+  'not-started': 'Not started',
+  researching: 'Researching',
+  contacted: 'Contacted',
+  quoted: 'Quote received',
+  booked: 'Booked',
+  'not-needed': 'Not needed',
+};

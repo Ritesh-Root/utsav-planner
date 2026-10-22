@@ -1,7 +1,7 @@
-import { useSyncExternalStore } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 
-import type { EventType } from '../shared/schemas.js';
-import { EVENT_TYPES } from '../shared/schemas.js';
+import type { EventType } from '../shared/constants.js';
+import { EVENT_TYPES } from '../shared/constants.js';
 
 export const PLAN_TABS = ['overview', 'budget', 'timeline', 'vendors', 'ideas'] as const;
 export type PlanTab = (typeof PLAN_TABS)[number];
@@ -33,6 +33,7 @@ export function parseRoute(hash: string): Route {
   return { name: 'not-found' };
 }
 
+/** The hash for a route; the inverse of parseRoute. */
 export function hrefFor(route: Route): string {
   switch (route.name) {
     case 'home':
@@ -48,6 +49,7 @@ export function hrefFor(route: Route): string {
   }
 }
 
+/** Go to a route; `replace` swaps the history entry (used for tab changes). */
 export function navigate(route: Route, options: { replace?: boolean } = {}): void {
   const href = hrefFor(route);
   if (options.replace) {
@@ -66,14 +68,22 @@ function currentRouteHash(): string {
   return lastRouteHash;
 }
 
-function subscribe(onChange: () => void): () => void {
-  window.addEventListener('hashchange', onChange);
-  return () => {
-    window.removeEventListener('hashchange', onChange);
-  };
-}
-
+/**
+ * The current route. Changes are React transitions, so while the next view's
+ * code loads the current screen stays up instead of flashing a loading state.
+ */
 export function useRoute(): Route {
-  const hash = useSyncExternalStore(subscribe, currentRouteHash, () => '');
+  const [hash, setHash] = useState(currentRouteHash);
+  useEffect(() => {
+    const onChange = () => {
+      startTransition(() => {
+        setHash(currentRouteHash());
+      });
+    };
+    window.addEventListener('hashchange', onChange);
+    return () => {
+      window.removeEventListener('hashchange', onChange);
+    };
+  }, []);
   return parseRoute(hash);
 }

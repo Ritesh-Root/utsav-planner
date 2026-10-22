@@ -19,6 +19,7 @@ const THEME_LABELS: Record<Theme, string> = {
   contrast: 'High contrast',
 };
 
+/** Appearance, the user's saved data (backup, restore, delete) and how AI is used. */
 export default function SettingsView() {
   const { settings, update } = useSettings();
   const store = usePlanStore();
@@ -39,11 +40,14 @@ export default function SettingsView() {
       return;
     }
     // Never overwrite an existing plan by accident: an id clash gets a new id.
-    const plan = store.getPlan(result.plan.id)
-      ? { ...result.plan, id: randomId('plan') }
-      : result.plan;
-    store.savePlan(plan);
-    const text = `Imported ${plan.brief.title}.`;
+    for (const plan of result.plans) {
+      store.savePlan(store.getPlan(plan.id) ? { ...plan, id: randomId('plan') } : plan);
+    }
+    const [first] = result.plans;
+    const text =
+      result.plans.length === 1 && first
+        ? `Imported ${first.brief.title}.`
+        : `Imported ${result.plans.length} plans.`;
     setImportMessage({ ok: true, text });
     announce(text);
   };
@@ -71,6 +75,7 @@ export default function SettingsView() {
                   <input
                     type="radio"
                     name="theme"
+                    value={theme}
                     checked={settings.theme === theme}
                     onChange={() => {
                       update({ theme });
@@ -84,6 +89,7 @@ export default function SettingsView() {
           <label className="choice">
             <input
               type="checkbox"
+              name="reading"
               checked={settings.reading === 'simple'}
               aria-describedby="reading-hint"
               onChange={(e) => {

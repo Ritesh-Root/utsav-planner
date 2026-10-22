@@ -1,17 +1,14 @@
-import type { SubmitEvent } from 'react';
-import { Suspense, lazy, useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { formatDate } from '../../shared/dates.js';
 import { computeInsights } from '../../shared/insights.js';
 import { LIMITS } from '../../shared/limits.js';
 import { formatMoney } from '../../shared/money.js';
-import { applyBriefChange } from '../../shared/plan.js';
 import type { Plan, RefineScope } from '../../shared/schemas.js';
-import { BriefSchema } from '../../shared/schemas.js';
-import { eventDateIssue } from '../../shared/timeline.js';
 import { ApiError, requestPlan } from '../api';
-import { ConfirmDialog, Dialog } from '../components/Dialog';
+import { ConfirmDialog } from '../components/Dialog';
 import { Pill, Toast } from '../components/Display';
+import { EditDetailsDialog } from '../components/EditDetailsDialog';
 import { ExportMenu } from '../components/ExportMenu';
 import type { RefineRequestState } from '../components/RefinePanel';
 import { RefinePanel } from '../components/RefinePanel';
@@ -19,22 +16,24 @@ import { RoadToTheDay } from '../components/RoadToTheDay';
 import { Tabs } from '../components/Tabs';
 import { useDocumentTitle, usePageFocus, useToday } from '../hooks';
 import { EVENT_TYPE_LABELS } from '../labels';
+import BudgetPanel from '../panels/BudgetPanel';
+import IdeasPanel from '../panels/IdeasPanel';
+import OverviewPanel from '../panels/OverviewPanel';
+import TimelinePanel from '../panels/TimelinePanel';
 import type { PanelProps, UpdateOptions } from '../panels/types';
+import VendorsPanel from '../panels/VendorsPanel';
 import type { PlanTab } from '../router';
 import { PLAN_TABS, navigate } from '../router';
 import { useAnnounce } from '../state/announcer';
 import { usePlanStore } from '../state/store';
 
-// Each tab is its own chunk, loaded when first opened.
-const PANELS: Record<
-  PlanTab,
-  React.LazyExoticComponent<(props: PanelProps) => React.JSX.Element>
-> = {
-  overview: lazy(() => import('../panels/OverviewPanel')),
-  budget: lazy(() => import('../panels/BudgetPanel')),
-  timeline: lazy(() => import('../panels/TimelinePanel')),
-  vendors: lazy(() => import('../panels/VendorsPanel')),
-  ideas: lazy(() => import('../panels/IdeasPanel')),
+// The panels are small, so they ship with the workspace: switching tabs never waits.
+const PANELS: Record<PlanTab, (props: PanelProps) => React.JSX.Element> = {
+  overview: OverviewPanel,
+  budget: BudgetPanel,
+  timeline: TimelinePanel,
+  vendors: VendorsPanel,
+  ideas: IdeasPanel,
 };
 
 const TAB_LABELS: Record<PlanTab, string> = {
@@ -45,129 +44,7 @@ const TAB_LABELS: Record<PlanTab, string> = {
   ideas: 'Ideas',
 };
 
-function EditDetails({
-  plan,
-  today,
-  onSave,
-  onClose,
-}: {
-  plan: Plan;
-  today: string;
-  onSave: (plan: Plan) => void;
-  onClose: () => void;
-}) {
-  const [title, setTitle] = useState(plan.brief.title);
-  const [date, setDate] = useState(plan.brief.date);
-  const [location, setLocation] = useState(plan.brief.location);
-  const [budget, setBudget] = useState(String(plan.brief.budget));
-  const [error, setError] = useState('');
-  const first = useRef<HTMLInputElement>(null);
-
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault();
-    const candidate = {
-      ...plan.brief,
-      title,
-      date,
-      location,
-      budget: Number(budget.replace(/[\s,]/g, '')),
-    };
-    const parsed = BriefSchema.safeParse(candidate);
-    if (!parsed.success) {
-      setError('Check the name, place and budget (a whole number above zero).');
-      return;
-    }
-    if (eventDateIssue(date, today)) {
-      setError('Choose a date from today up to three years ahead.');
-      return;
-    }
-    onSave(applyBriefChange(plan, parsed.data, today, new Date()));
-  };
-
-  return (
-    <Dialog open onClose={onClose} title="Edit event details" initialFocus={first}>
-      <form className="form" onSubmit={submit} noValidate>
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="field">
-          <label className="label" htmlFor="edit-title">
-            Event name
-          </label>
-          <input
-            ref={first}
-            id="edit-title"
-            className="input"
-            maxLength={LIMITS.titleMax}
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-            }}
-          />
-        </div>
-        <div className="field-row">
-          <div className="field">
-            <label className="label" htmlFor="edit-date">
-              Date
-            </label>
-            <input
-              id="edit-date"
-              className="input"
-              type="date"
-              value={date}
-              onChange={(e) => {
-                setDate(e.target.value);
-              }}
-            />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="edit-location">
-              City or area
-            </label>
-            <input
-              id="edit-location"
-              className="input"
-              maxLength={LIMITS.locationMax}
-              value={location}
-              onChange={(e) => {
-                setLocation(e.target.value);
-              }}
-            />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="edit-budget">
-              Total budget ({plan.brief.currency})
-            </label>
-            <input
-              id="edit-budget"
-              className="input"
-              inputMode="numeric"
-              value={budget}
-              onChange={(e) => {
-                setBudget(e.target.value);
-              }}
-            />
-          </div>
-        </div>
-        <p className="hint">
-          A new date moves every open task; a new budget re-splits the lines you have not set
-          yourself.
-        </p>
-        <div className="dialog-actions">
-          <button type="button" className="btn btn-quiet" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-primary">
-            Save details
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
+/** One event's workspace: the title row, the road to the day and the five tabs. */
 export default function PlanView({ id, tab }: { id: string; tab: PlanTab }) {
   const today = useToday();
   const store = usePlanStore();
@@ -206,6 +83,14 @@ export default function PlanView({ id, tab }: { id: string; tab: PlanTab }) {
     },
     [id],
   );
+
+  if (!plan && !store.ready) {
+    return (
+      <p className="meta" role="status">
+        Loading your plan…
+      </p>
+    );
+  }
 
   if (!plan) {
     return (
@@ -320,9 +205,7 @@ export default function PlanView({ id, tab }: { id: string; tab: PlanTab }) {
         idPrefix="plan"
       />
       <div id="plan-panel" role="tabpanel" aria-labelledby={`plan-tab-${tab}`}>
-        <Suspense fallback={<p className="panel">Loading {TAB_LABELS[tab].toLowerCase()}…</p>}>
-          <Panel plan={plan} today={today} update={update} refine={refine} goTo={goTo} />
-        </Suspense>
+        <Panel plan={plan} today={today} update={update} refine={refine} goTo={goTo} />
       </div>
 
       <section className="danger-zone" aria-labelledby="danger-title">
@@ -363,7 +246,7 @@ export default function PlanView({ id, tab }: { id: string; tab: PlanTab }) {
         />
       )}
       {editing && (
-        <EditDetails
+        <EditDetailsDialog
           plan={plan}
           today={today}
           onClose={() => {
