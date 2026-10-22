@@ -86,6 +86,10 @@ locally) authenticate to Vertex AI.
 - Pure, documented domain functions with `today` passed in; side effects only at the edges. The server is
   built by `createApp(deps)` so tests inject a fake model.
 - Every bound lives in `src/shared/limits.ts` and feeds validation, prompts and form `maxLength` alike.
+- Small units, enforced by lint: every function in `src` stays within cyclomatic complexity 12, 80 lines,
+  25 statements, 4 parameters and 3 levels of nesting, and every file within 400 lines. Repeated UI is
+  shared: titled cards (`Panel`), page headings (`PageTitle`), form fields (`TextField`, `SelectField`) and
+  one `Select` that only ever passes on a listed value.
 
 ### Security
 
@@ -120,7 +124,7 @@ locally) authenticate to Vertex AI.
 
 ### Testing
 
-- **244 tests** (Vitest) in a node project (shared domain, server, styles) and a jsdom project (client),
+- **247 tests** (Vitest) in a node project (shared domain, server, styles) and a jsdom project (client),
   hermetic: no network, no credentials, no build step, any time zone. CI also runs them on Node 22, 24 and
   26 in three time zones.
 - Highlights: a 500-case property test that budgets always add up, and a 300-run one that they still do
@@ -175,7 +179,7 @@ gcloud run deploy utsav-planner --source . --region us-central1 \
 src/shared/   constants, schemas, limits, dates, money, budget, timeline, vendors, insights, ics, links, sanitize,
               plan (+ plan/: build, edits, refine, diff), templates/, presets
 src/server/   main, app (createApp), routes, security, errors, logger, config,
-              ai/ (gemini, prompts, schema, normalize, planner, guards)
+              ai/ (gemini, prompts, schema, normalize, planner, callModel, memo, failures, guards)
 src/client/   main, App, router, api, hooks, offline, browserStorage, storage, briefDraft, labels, settings,
               state/, components/, panels/, views/, assets/, styles/
 tests/        shared/, server/, client/, styles/, fixtures/, setup/

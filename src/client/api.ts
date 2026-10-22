@@ -33,23 +33,18 @@ interface ErrorBody {
   error?: { code?: string; message?: string; fields?: FieldIssue[] };
 }
 
-async function postJson<S extends z.ZodType>(
-  path: string,
-  body: unknown,
-  schema: S,
-  signal?: AbortSignal,
-): Promise<z.infer<S>> {
+/** POST JSON; a network failure or timeout becomes an ApiError with status 0. */
+async function send(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
   const timeout = AbortSignal.timeout(TIMEOUT_MS);
-  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
-  let response: Response;
   try {
-    response = await fetch(path, {
+    return await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: combined,
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
   } catch (error) {
+    // The caller cancelling is not a failure to report; let it through unchanged.
     if (signal?.aborted) throw error;
     throw new ApiError(
       0,
@@ -57,16 +52,28 @@ async function postJson<S extends z.ZodType>(
       'Couldn’t reach Utsav. Check your connection and try again.',
     );
   }
+}
+
+/** The server's `{ error: { code, message, fields } }` body, as an ApiError. */
+function errorFrom(status: number, data: unknown): ApiError {
+  const info = (data as ErrorBody | null)?.error;
+  return new ApiError(
+    status,
+    info?.code ?? 'HTTP_ERROR',
+    info?.message ?? 'Something went wrong. Please try again.',
+    info?.fields ?? [],
+  );
+}
+
+async function postJson<S extends z.ZodType>(
+  path: string,
+  body: unknown,
+  schema: S,
+  signal?: AbortSignal,
+): Promise<z.infer<S>> {
+  const response = await send(path, body, signal);
   const data: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const info = (data as ErrorBody | null)?.error;
-    throw new ApiError(
-      response.status,
-      info?.code ?? 'HTTP_ERROR',
-      info?.message ?? 'Something went wrong. Please try again.',
-      info?.fields ?? [],
-    );
-  }
+  if (!response.ok) throw errorFrom(response.status, data);
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
     throw new ApiError(response.status, 'BAD_RESPONSE', 'Utsav sent back something unexpected.');

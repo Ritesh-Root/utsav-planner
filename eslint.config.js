@@ -35,6 +35,18 @@ export default defineConfig(
     },
   },
   {
+    // Keep functions small enough to read in one sitting; tests and scripts are exempt.
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      complexity: ['error', 12],
+      'max-depth': ['error', 3],
+      'max-params': ['error', 4],
+      'max-statements': ['error', 25],
+      'max-lines-per-function': ['error', { max: 80, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 400, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
     files: ['src/client/**/*.{ts,tsx}', 'tests/client/**/*.{ts,tsx}'],
     extends: [reactHooks.configs.flat['recommended-latest'], jsxA11y.flatConfigs.strict],
     languageOptions: { globals: globals.browser },

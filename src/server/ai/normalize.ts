@@ -1,3 +1,5 @@
+import type { z } from 'zod';
+
 import { clampStartMinute } from '../../shared/dates.js';
 import { LIMITS, REFINE_MINIMUMS } from '../../shared/limits.js';
 import { estimateCap, toWholeAmount } from '../../shared/money.js';
@@ -163,6 +165,48 @@ function cleanPatch(patch: Record<string, unknown> | undefined, today: string): 
   return validated.success && Object.keys(validated.data).length > 0 ? validated.data : null;
 }
 
+type Sections = RefineResult['sections'];
+type AiRefine = z.infer<typeof AiRefineSchema>;
+
+type SectionName = keyof Sections;
+const SECTION_NAMES: readonly SectionName[] = ['budget', 'timeline', 'vendors', 'ideas', 'dayOf'];
+
+/** How to clean each section; `sized` is the brief as the refinement leaves it. */
+function sectionCleaners(value: AiRefine, sized: Brief): { [K in SectionName]: () => Sections[K] } {
+  return {
+    budget: () => value.budget && cleanBudget(value.budget, sized.budget).map(keepId),
+    timeline: () => value.timeline && cleanTasks(value.timeline).map(keepId),
+    vendors: () => value.vendors && cleanVendors(value.vendors).map(keepId),
+    ideas: () => value.ideas && cleanIdeas(value.ideas).map(keepId),
+    dayOf: () => value.dayOf && cleanDayOf(value.dayOf, sized.days).map(keepId),
+  };
+}
+
+function setSection<K extends SectionName>(sections: Sections, name: K, items: Sections[K]) {
+  sections[name] = items;
+}
+
+/** The sections the scope allows, cleaned; anything else the model sent is never read. */
+function cleanSections(value: AiRefine, scope: RefineScope, sized: Brief): Sections {
+  const cleaners = sectionCleaners(value, sized);
+  const sections: Sections = {};
+  for (const name of scope === 'all' ? SECTION_NAMES : [scope]) {
+    const items = cleaners[name]();
+    if (items) setSection(sections, name, items);
+  }
+  return sections;
+}
+
+function requireMinimums(sections: Sections): void {
+  for (const [section, min] of Object.entries(REFINE_MINIMUMS) as [
+    keyof typeof REFINE_MINIMUMS,
+    number,
+  ][]) {
+    const items = sections[section];
+    if (items) requireAtLeast(items, min, section);
+  }
+}
+
 /** Validate and clean a refinement, keeping only sections the scope allows. */
 export function normalizeRefine(
   raw: unknown,
@@ -172,38 +216,17 @@ export function normalizeRefine(
 ): RefineResult {
   const parsed = AiRefineSchema.safeParse(raw);
   if (!parsed.success) throw new InvalidOutputError('refinement does not match the schema');
-  const value = parsed.data;
-  const allowed = (section: Exclude<RefineScope, 'all'>) => scope === 'all' || scope === section;
-
-  const sections: RefineResult['sections'] = {};
-  if (value.budget && allowed('budget')) {
-    sections.budget = cleanBudget(value.budget, value.briefPatch?.budget ?? brief.budget).map(
-      keepId,
-    );
-  }
-  if (value.timeline && allowed('timeline'))
-    sections.timeline = cleanTasks(value.timeline).map(keepId);
-  if (value.vendors && allowed('vendors'))
-    sections.vendors = cleanVendors(value.vendors).map(keepId);
-  if (value.ideas && allowed('ideas')) sections.ideas = cleanIdeas(value.ideas).map(keepId);
-  if (value.dayOf && allowed('dayOf')) {
-    sections.dayOf = cleanDayOf(value.dayOf, value.briefPatch?.days ?? brief.days).map(keepId);
-  }
-
-  for (const [section, min] of Object.entries(REFINE_MINIMUMS) as [
-    keyof typeof REFINE_MINIMUMS,
-    number,
-  ][]) {
-    const items = sections[section];
-    if (items) requireAtLeast(items, min, section);
-  }
+  const briefPatch = cleanPatch(parsed.data.briefPatch, today);
+  // Size budgets and run-sheet days by the brief the refinement will produce, so only
+  // patch values that passed their checks count.
+  const sections = cleanSections(parsed.data, scope, { ...brief, ...briefPatch });
+  requireMinimums(sections);
   if (scope !== 'all' && !sections[scope]) {
     throw new InvalidOutputError(`missing the ${scope} section`);
   }
-
   return {
-    message: cleanText(value.message, mediumText) || 'Updated your plan.',
-    briefPatch: cleanPatch(value.briefPatch, today),
+    message: cleanText(parsed.data.message, mediumText) || 'Updated your plan.',
+    briefPatch,
     sections,
   };
 }

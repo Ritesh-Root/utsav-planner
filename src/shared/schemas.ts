@@ -81,11 +81,9 @@ const text = (description: string) => z.string().min(1).meta({ description });
  */
 const list = <T extends z.ZodType>(
   item: T,
-  min: number,
-  target: number,
-  max: number,
   description: string,
-) => z.array(item).min(min).meta({ minItems: target, maxItems: max, description });
+  size: { min: number; target: number; max: number },
+) => z.array(item).min(size.min).meta({ minItems: size.target, maxItems: size.max, description });
 
 /** A budget line as the model returns it: a share, never an amount. */
 export const AiBudgetLineSchema = z.object({
@@ -153,11 +151,31 @@ export const AiPlanSchema = z.object({
     .meta({ maxItems: LIMITS.assumptionsMax, description: 'Assumptions the user should check' }),
   // Larger `minItems` targets made Vertex reject the schema as too complex
   // (HTTP 400, Oct 2026); the prompt asks for fuller lists instead.
-  budget: list(AiBudgetLineSchema, LIMITS.budgetLinesMin, 5, LIMITS.budgetLinesMax, 'Budget lines'),
-  timeline: list(AiTaskSchema, LIMITS.tasksMin, 8, LIMITS.tasksMax, 'Preparation tasks'),
-  vendors: list(AiVendorSchema, LIMITS.vendorsMin, 5, LIMITS.vendorsMax, 'Vendor checklist'),
-  ideas: list(AiIdeaSchema, LIMITS.ideasMin, 5, LIMITS.ideasMax, 'Personalised ideas'),
-  dayOf: list(AiDayOfSchema, 1, 1, LIMITS.dayOfMax, 'Run sheet for the event day(s)'),
+  budget: list(AiBudgetLineSchema, 'Budget lines', {
+    min: LIMITS.budgetLinesMin,
+    target: 5,
+    max: LIMITS.budgetLinesMax,
+  }),
+  timeline: list(AiTaskSchema, 'Preparation tasks', {
+    min: LIMITS.tasksMin,
+    target: 8,
+    max: LIMITS.tasksMax,
+  }),
+  vendors: list(AiVendorSchema, 'Vendor checklist', {
+    min: LIMITS.vendorsMin,
+    target: 5,
+    max: LIMITS.vendorsMax,
+  }),
+  ideas: list(AiIdeaSchema, 'Personalised ideas', {
+    min: LIMITS.ideasMin,
+    target: 5,
+    max: LIMITS.ideasMax,
+  }),
+  dayOf: list(AiDayOfSchema, 'Run sheet for the event day(s)', {
+    min: LIMITS.dayOfMin,
+    target: 1,
+    max: LIMITS.dayOfMax,
+  }),
 });
 export type AiPlan = z.infer<typeof AiPlanSchema>;
 export type AiBudgetLine = z.infer<typeof AiBudgetLineSchema>;

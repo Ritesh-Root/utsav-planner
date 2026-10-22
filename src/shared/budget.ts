@@ -39,21 +39,20 @@ export interface ShareLine {
 }
 
 /**
- * Keep a contingency line between 5% and 15% of the budget, adding one (8%) if it
- * is missing, and scale the other lines to fill the rest. Returns basis points.
+ * Keep a contingency line between 5% and 15% of the budget, adding one (8%) as the
+ * last entry if it is missing, and scale the other lines to fill the rest. Returns
+ * basis points, one per line plus the added contingency.
  */
-export function withContingency(lines: readonly ShareLine[]): { keys: string[]; bp: number[] } {
+export function withContingency(lines: readonly ShareLine[]): number[] {
   const minBp = LIMITS.contingencyMinPct * 100;
   const maxBp = LIMITS.contingencyMaxPct * 100;
   const defaultBp = LIMITS.contingencyDefaultPct * 100;
 
-  const keys = lines.map((line) => line.key);
-  let index = keys.indexOf('contingency');
   const shares = lines.map((line) => line.share);
+  let index = lines.findIndex((line) => line.key === 'contingency');
   if (index === -1) {
-    keys.push('contingency');
     shares.push(0);
-    index = keys.length - 1;
+    index = shares.length - 1;
   }
 
   // Only respect a contingency share the input actually gave a weight to.
@@ -66,8 +65,7 @@ export function withContingency(lines: readonly ShareLine[]): { keys: string[]; 
     ? otherWeights.map((_, i) => (i === index ? 0 : 1))
     : otherWeights;
   const others = apportion(BASIS_POINTS - target, othersOnly);
-  const bp = others.map((value, i) => (i === index ? target : value));
-  return { keys, bp };
+  return others.map((value, i) => (i === index ? target : value));
 }
 
 export interface AllocatableLine {

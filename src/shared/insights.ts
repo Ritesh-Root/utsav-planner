@@ -1,5 +1,5 @@
 import { summarizeBudget } from './budget.js';
-import { formatMoney } from './money.js';
+import { moneyFormatter } from './money.js';
 import type { Plan } from './schemas.js';
 import { daysUntil, taskStatus } from './timeline.js';
 import { committedByKey, vendorState } from './vendors.js';
@@ -22,30 +22,28 @@ function listNames(names: string[], max = 3): string {
   return names.length > max ? `${shown} and ${names.length - max} more` : shown;
 }
 
-/** Plain-language nudges shown on the Overview, most urgent first. */
-export function computeInsights(plan: Plan, today: string): Insight[] {
-  const { brief } = plan;
-  const money = (value: number) => formatMoney(value, brief.currency);
-  const insights: Insight[] = [];
-  const days = daysUntil(brief.date, today);
-
+function timingInsight(days: number): Insight | null {
   if (days < 0) {
-    insights.push({
+    return {
       id: 'event-passed',
       tone: 'info',
       text: 'The event date has passed. Wrap up the after-event tasks and payments.',
-    });
-  } else if (days === 0) {
-    insights.push({ id: 'event-today', tone: 'info', text: 'It is the big day. Enjoy it!' });
-  } else if (days <= LAST_MINUTE_DAYS) {
-    insights.push({
-      id: 'last-minute',
-      tone: 'warning',
-      text: `Last-minute mode: ${plural(days, 'day')} to go. Focus on high-priority tasks and confirmed bookings.`,
-    });
+    };
   }
+  if (days === 0) return { id: 'event-today', tone: 'info', text: 'It is the big day. Enjoy it!' };
+  if (days > LAST_MINUTE_DAYS) return null;
+  return {
+    id: 'last-minute',
+    tone: 'warning',
+    text: `Last-minute mode: ${plural(days, 'day')} to go. Focus on high-priority tasks and confirmed bookings.`,
+  };
+}
 
+function spendingInsights(plan: Plan): Insight[] {
+  const { brief } = plan;
+  const money = moneyFormatter(brief.currency);
   const summary = summarizeBudget(plan.budget, brief.budget, brief.guests);
+  const insights: Insight[] = [];
   if (summary.overBy > 0) {
     insights.push({
       id: 'over-budget',
@@ -60,9 +58,16 @@ export function computeInsights(plan: Plan, today: string): Insight[] {
       text: `Money spent so far (${money(summary.actual)}) is more than the total budget.`,
     });
   }
+  return insights;
+}
 
+function estimateInsights(plan: Plan): Insight[] {
   const committed = committedByKey(plan.vendors);
   const overCommitted = plan.budget.filter((line) => (committed[line.key] ?? 0) > line.amount);
+  const underEstimate = plan.budget.filter(
+    (line) => !line.locked && line.estLow > 0 && line.amount < line.estLow,
+  );
+  const insights: Insight[] = [];
   if (overCommitted.length > 0) {
     insights.push({
       id: 'quotes-over-plan',
@@ -70,10 +75,6 @@ export function computeInsights(plan: Plan, today: string): Insight[] {
       text: `Booked quotes are higher than planned for ${listNames(overCommitted.map((l) => l.category))}.`,
     });
   }
-
-  const underEstimate = plan.budget.filter(
-    (line) => !line.locked && line.estLow > 0 && line.amount < line.estLow,
-  );
   if (underEstimate.length > 0) {
     insights.push({
       id: 'below-estimate',
@@ -81,10 +82,14 @@ export function computeInsights(plan: Plan, today: string): Insight[] {
       text: `${listNames(underEstimate.map((l) => l.category))} ${underEstimate.length === 1 ? 'is' : 'are'} planned below the typical local estimate. Check prices early.`,
     });
   }
+  return insights;
+}
 
+function taskInsights(plan: Plan, today: string): Insight[] {
   const statuses = plan.tasks.map((task) => taskStatus(task, today));
   const overdue = statuses.filter((s) => s === 'overdue').length;
   const doNow = statuses.filter((s) => s === 'do-now').length;
+  const insights: Insight[] = [];
   if (overdue > 0) {
     insights.push({
       id: 'tasks-overdue',
@@ -99,20 +104,34 @@ export function computeInsights(plan: Plan, today: string): Insight[] {
       text: `${plural(doNow, 'task')} should be done now: the ideal time for ${doNow === 1 ? 'it has' : 'them has'} already passed.`,
     });
   }
+  return insights;
+}
 
+function vendorInsight(plan: Plan, today: string): Insight | null {
   const toBook = plan.vendors.filter((vendor) => {
     const state = vendorState(vendor, today);
     return state === 'overdue' || state === 'book-soon';
   });
-  if (toBook.length > 0) {
-    insights.push({
-      id: 'book-vendors',
-      tone: 'warning',
-      text: `Book soon: ${listNames(toBook.map((v) => v.category))}.`,
-    });
-  }
+  if (toBook.length === 0) return null;
+  return {
+    id: 'book-vendors',
+    tone: 'warning',
+    text: `Book soon: ${listNames(toBook.map((v) => v.category))}.`,
+  };
+}
 
-  if (!insights.some((insight) => insight.tone === 'alert' || insight.tone === 'warning')) {
+const needsAction = (insight: Insight) => insight.tone === 'alert' || insight.tone === 'warning';
+
+/** Plain-language nudges shown on the Overview, most urgent first. */
+export function computeInsights(plan: Plan, today: string): Insight[] {
+  const insights = [
+    timingInsight(daysUntil(plan.brief.date, today)),
+    ...spendingInsights(plan),
+    ...estimateInsights(plan),
+    ...taskInsights(plan, today),
+    vendorInsight(plan, today),
+  ].filter((insight) => insight !== null);
+  if (!insights.some(needsAction)) {
     insights.push({ id: 'on-track', tone: 'success', text: 'Everything is on track.' });
   }
   return insights;

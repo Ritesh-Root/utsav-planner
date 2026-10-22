@@ -1,5 +1,7 @@
-import type { ReactNode, SubmitEvent } from 'react';
+import type { InputHTMLAttributes, ReactNode, SubmitEvent } from 'react';
 import { createContext, useContext, useId } from 'react';
+
+import { Select } from './Select';
 
 /** What went wrong, and which of the form's fields it is about. */
 export interface FormError {
@@ -100,5 +102,77 @@ export function FormField({
         'aria-describedby': invalid ? `${id}-error` : undefined,
       })}
     </div>
+  );
+}
+
+/** The error shown when a section already holds as many items as a plan keeps. */
+export function fullPlanError(items: string): FormError {
+  return {
+    message: `This plan already holds as many ${items} as Utsav keeps. Remove one first.`,
+    fields: [],
+  };
+}
+
+type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'id' | 'name' | 'value' | 'onChange'>;
+
+/** A text input in an InlineForm; other input props (type, min, maxLength…) pass through. */
+export function TextField({
+  name,
+  label,
+  value,
+  onChange,
+  ...input
+}: InputProps & {
+  name: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <FormField name={name} label={label}>
+      {(control) => (
+        <input
+          {...input}
+          {...control}
+          className="input"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+          }}
+        />
+      )}
+    </FormField>
+  );
+}
+
+/** A choice from a fixed list in an InlineForm; only listed values ever reach `onChange`. */
+export function SelectField<T extends string>({
+  name,
+  label,
+  value,
+  options,
+  optionLabel,
+  onChange,
+}: {
+  name: string;
+  label: string;
+  value: T;
+  options: readonly T[];
+  optionLabel: (option: T) => string;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <FormField name={name} label={label}>
+      {(control) => (
+        <Select
+          {...control}
+          className="select"
+          value={value}
+          options={options}
+          optionLabel={optionLabel}
+          onChange={onChange}
+        />
+      )}
+    </FormField>
   );
 }

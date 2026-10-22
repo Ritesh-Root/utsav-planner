@@ -21,6 +21,7 @@ import {
 } from '../../src/shared/plan.js';
 import type { Plan } from '../../src/shared/schemas.js';
 import { PlanSchema } from '../../src/shared/schemas.js';
+import { addDays } from '../../src/shared/dates.js';
 import { LIMITS } from '../../src/shared/limits.js';
 import {
   NOW,
@@ -107,14 +108,21 @@ describe('task, vendor, idea and run-sheet edits', () => {
     const added = addCustomVendor(
       plan,
       { category: '  Live band ', budgetKey: 'entertainment', bookBy: '2026-11-07' },
-      ids(),
-      TODAY,
-      NOW,
+      { today: TODAY, now: NOW, newId: ids() },
     );
     const band = added.vendors.find((v) => v.category === 'Live band');
     expect(band).toMatchObject({ bookBy: '2026-11-07', bookDaysBefore: 14, status: 'not-started' });
     expect(removeVendor(added, band?.id ?? '', NOW).vendors).toHaveLength(plan.vendors.length);
     expect(PlanSchema.safeParse(added).success).toBe(true);
+  });
+
+  it('never sets a book-by date before today', () => {
+    const added = addCustomVendor(
+      plan,
+      { category: 'Magician', budgetKey: 'entertainment', bookBy: addDays(TODAY, -5) },
+      { today: TODAY, now: NOW, newId: sequentialIds('late') },
+    );
+    expect(added.vendors.find((v) => v.category === 'Magician')?.bookBy).toBe(TODAY);
   });
 
   it('saves ideas and adds the user’s own, already saved', () => {

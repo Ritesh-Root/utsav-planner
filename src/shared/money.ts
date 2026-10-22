@@ -22,6 +22,13 @@ export function formatMoney(amount: number, currency: Currency, locale = 'en-IN'
   return formatter.format(Math.round(amount));
 }
 
+export type FormatMoney = (amount: number) => string;
+
+/** `formatMoney` fixed to one currency, for views that show many amounts in it. */
+export function moneyFormatter(currency: Currency): FormatMoney {
+  return (amount) => formatMoney(amount, currency);
+}
+
 /**
  * A whole number typed by a person, forgiving spaces and thousands separators
  * ("2,50,000", "25 000"). Null for anything else, including decimals.

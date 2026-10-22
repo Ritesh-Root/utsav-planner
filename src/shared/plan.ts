@@ -4,7 +4,7 @@
  */
 export type { IdFactory } from './plan/build.js';
 export { randomId, finalizePlan } from './plan/build.js';
-export type { VendorChanges } from './plan/edits.js';
+export type { GuestChangeMode, VendorChanges } from './plan/edits.js';
 export {
   applyBriefChange,
   setLineAmount,

@@ -351,6 +351,18 @@ describe('things going wrong', () => {
     expect(screen.queryByRole('heading', { name: 'Magician' })).not.toBeInTheDocument();
   });
 
+  it('refuses a book-by date that has already passed', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<PlanView id="plan-1" tab="vendors" />, [planFor()]);
+    await user.type(screen.getByLabelText('Kind of vendor'), 'Magician');
+    const bookBy = screen.getByLabelText('Book by');
+    fireEvent.change(bookBy, { target: { value: '2026-10-01' } });
+    await user.click(screen.getByRole('button', { name: 'Add vendor' }));
+    expect(alertText()).toContain('Choose today or a later date to book by.');
+    expect(bookBy).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByRole('heading', { name: 'Magician' })).not.toBeInTheDocument();
+  });
+
   it('keeps the plan as it was when a refinement is discarded', async () => {
     const user = userEvent.setup();
     const plan = planFor();

@@ -106,49 +106,49 @@ const MESSAGES: Partial<Record<BriefField, string>> = {
   priorities: `Choose up to ${LIMITS.prioritiesMax}.`,
 };
 
+const DATE_MESSAGES = {
+  past: 'Choose today or a date in the future.',
+  'too-far': 'Choose a date within the next three years.',
+} as const;
+
+/** The draft's raw strings as the values a Brief holds; numbers that don't parse become null. */
+function candidate(draft: BriefDraft) {
+  const birthday = draft.type === 'birthday';
+  const age = draft.honoreeAge.trim();
+  return {
+    ...draft,
+    guests: parseWholeNumber(draft.guests),
+    budget: parseWholeNumber(draft.budget),
+    days: birthday ? 1 : parseWholeNumber(draft.days),
+    honoreeAge: birthday && age !== '' ? parseWholeNumber(age) : null,
+  };
+}
+
+/** The first problem with each field, in words a person can act on. */
+function issueErrors(issues: readonly { path: readonly PropertyKey[]; message: string }[]) {
+  const errors: FieldErrors = {};
+  for (const issue of issues) {
+    const field = issue.path[0] as BriefField;
+    errors[field] ??= MESSAGES[field] ?? issue.message;
+  }
+  return errors;
+}
+
 /** Validate the form: a Brief, or a plain-language message for each field to fix. */
 export function toBrief(
   draft: BriefDraft,
   today: string,
 ): { brief: Brief; errors: null } | { brief: null; errors: FieldErrors } {
-  const ageText = draft.honoreeAge.trim();
-  const candidate = {
-    type: draft.type,
-    title: draft.title,
-    date: draft.date,
-    location: draft.location,
-    guests: parseWholeNumber(draft.guests),
-    budget: parseWholeNumber(draft.budget),
-    currency: draft.currency,
-    venue: draft.venue,
-    style: draft.style,
-    priorities: draft.priorities,
-    dietary: draft.dietary,
-    days: draft.type === 'birthday' ? 1 : parseWholeNumber(draft.days),
-    honoreeAge: draft.type === 'birthday' && ageText !== '' ? parseWholeNumber(ageText) : null,
-    notes: draft.notes,
-  };
-
-  const errors: FieldErrors = {};
-  const parsed = BriefSchema.safeParse(candidate);
-  if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0] as BriefField;
-      errors[field] ??= MESSAGES[field] ?? issue.message;
-    }
-  }
-  // An age that was typed but is not a number fails the number check above, not the schema.
-  if (draft.type === 'birthday' && ageText !== '' && parseWholeNumber(ageText) === null) {
+  const parsed = BriefSchema.safeParse(candidate(draft));
+  const errors = parsed.success ? {} : issueErrors(parsed.error.issues);
+  // An age that was typed but is not a number becomes null, which the schema allows.
+  const age = draft.honoreeAge.trim();
+  if (draft.type === 'birthday' && age !== '' && parseWholeNumber(age) === null) {
     errors.honoreeAge = MESSAGES.honoreeAge;
   }
-  if (!errors.date) {
-    const issue = eventDateIssue(draft.date, today);
-    if (issue === 'past') errors.date = 'Choose today or a date in the future.';
-    if (issue === 'too-far') errors.date = 'Choose a date within the next three years.';
-  }
-  if (Object.keys(errors).length > 0 || !parsed.success) {
-    return { brief: null, errors };
-  }
+  const dateIssue = errors.date ? null : eventDateIssue(draft.date, today);
+  if (dateIssue) errors.date = DATE_MESSAGES[dateIssue];
+  if (!parsed.success || Object.keys(errors).length > 0) return { brief: null, errors };
   return { brief: parsed.data, errors: null };
 }
 

@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 
 import type { Currency } from '../../shared/money.js';
 import { formatMoney, parseWholeNumber } from '../../shared/money.js';
+import type { VendorState } from '../../shared/vendors.js';
 
 /** An amount in the plan's currency, with tabular digits. */
 export function Money({ amount, currency }: { amount: number; currency: Currency }) {
@@ -54,15 +55,23 @@ export function Track({
   );
 }
 
+type PillTone = 'neutral' | 'positive' | 'negative' | 'warning' | 'accent';
+
 /** A small status label; the tone is never the only signal, the words carry it. */
-export function Pill({
-  tone = 'neutral',
-  children,
-}: {
-  tone?: 'neutral' | 'positive' | 'negative' | 'warning' | 'accent';
-  children: ReactNode;
-}) {
+export function Pill({ tone = 'neutral', children }: { tone?: PillTone; children: ReactNode }) {
   return <span className={`pill${tone === 'neutral' ? '' : ` pill-${tone}`}`}>{children}</span>;
+}
+
+const VENDOR_PILLS: Partial<Record<VendorState, { tone: PillTone; text: string }>> = {
+  overdue: { tone: 'negative', text: 'Book now' },
+  'book-soon': { tone: 'warning', text: 'Book soon' },
+  booked: { tone: 'positive', text: 'Booked' },
+};
+
+/** Where a vendor booking stands, when it needs attention or is done. */
+export function VendorStatePill({ state }: { state: VendorState }) {
+  const pill = VENDOR_PILLS[state];
+  return pill ? <Pill tone={pill.tone}>{pill.text}</Pill> : null;
 }
 
 /** Digit grouping that matches the money format used everywhere else (en-IN: 2,50,000). */

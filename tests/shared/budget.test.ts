@@ -63,11 +63,11 @@ describe('apportion', () => {
 
 describe('withContingency', () => {
   it('adds an 8% contingency when the plan has none', () => {
-    const { keys, bp } = withContingency([
+    const bp = withContingency([
       { key: 'venue', share: 50 },
       { key: 'catering', share: 50 },
     ]);
-    expect(keys).toEqual(['venue', 'catering', 'contingency']);
+    // The added contingency is the last entry.
     expect(bp).toEqual([4600, 4600, 800]);
   });
 
@@ -76,17 +76,17 @@ describe('withContingency', () => {
       { key: 'venue', share: 98 },
       { key: 'contingency', share: 2 },
     ]);
-    expect(low.bp[1]).toBe(500);
+    expect(low[1]).toBe(500);
     const high = withContingency([
       { key: 'venue', share: 60 },
       { key: 'contingency', share: 40 },
     ]);
-    expect(high.bp[1]).toBe(1500);
-    expect(sum(high.bp)).toBe(10_000);
+    expect(high[1]).toBe(1500);
+    expect(sum(high)).toBe(10_000);
   });
 
   it('still produces a valid split when only the contingency has weight', () => {
-    const { bp } = withContingency([
+    const bp = withContingency([
       { key: 'venue', share: 0 },
       { key: 'contingency', share: 0 },
     ]);

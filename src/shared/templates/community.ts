@@ -1,161 +1,154 @@
+import type { AiPlan } from '../schemas.js';
 import type { EventTemplate } from './types.js';
-import { at, share } from './types.js';
+import { at, fixedCost, perGuestCost } from './types.js';
+
+/** The same preparation for every community event; the event date positions it. */
+const TASKS: AiPlan['timeline'] = [
+  {
+    title: 'Form an organising committee and assign roles',
+    details: 'Name leads for permits, money, safety, programme and volunteers.',
+    daysBefore: 120,
+    priority: 'high',
+  },
+  {
+    title: 'Apply for local permits and permissions',
+    details: 'Check what your local authority needs for crowds, sound and food stalls.',
+    daysBefore: 90,
+    priority: 'high',
+  },
+  {
+    title: 'Book the ground or hall',
+    details: 'Confirm capacity, power, water and step-free access.',
+    daysBefore: 90,
+    priority: 'high',
+  },
+  {
+    title: 'Set the budget and sponsorship plan',
+    details: 'List costs and approach local businesses and residents for support.',
+    daysBefore: 75,
+    priority: 'medium',
+  },
+  {
+    title: 'Book sound, lighting and a generator',
+    details: 'Ask about noise limits and cut-off times.',
+    daysBefore: 60,
+    priority: 'medium',
+  },
+  {
+    title: 'Line up performers and competitions',
+    details: 'Mix acts for children, families and elders.',
+    daysBefore: 60,
+    priority: 'medium',
+  },
+  {
+    title: 'Recruit and organise volunteers',
+    details: 'Plan shifts for entry, stalls, safety and cleanup.',
+    daysBefore: 45,
+    priority: 'high',
+  },
+  {
+    title: 'Publicise the event',
+    details: 'Use posters, residents’ groups and social media.',
+    daysBefore: 30,
+    priority: 'medium',
+  },
+  {
+    title: 'Write the safety plan',
+    details: 'Cover first aid, fire extinguishers, crowd flow and lost-child points.',
+    daysBefore: 30,
+    priority: 'high',
+  },
+  {
+    title: 'Plan accessibility',
+    details: 'Arrange ramps, reserved seating and accessible toilets.',
+    daysBefore: 21,
+    priority: 'high',
+  },
+  {
+    title: 'Arrange waste segregation and cleanup',
+    details: 'Place labelled bins and agree who clears the site.',
+    daysBefore: 21,
+    priority: 'medium',
+  },
+  {
+    title: 'Brief volunteers and walk the site',
+    details: 'Share the run sheet, emergency contacts and exits.',
+    daysBefore: 3,
+    priority: 'high',
+  },
+  {
+    title: 'Set up the site',
+    details: 'Put up tents, stage, signs and bins.',
+    daysBefore: 1,
+    priority: 'high',
+  },
+  {
+    title: 'Run the event and keep a log',
+    details: 'Keep one coordinator free to handle problems.',
+    daysBefore: 0,
+    priority: 'high',
+  },
+  {
+    title: 'Clean up and return rentals',
+    details: 'Leave the site as you found it.',
+    daysBefore: -1,
+    priority: 'high',
+  },
+  {
+    title: 'Thank volunteers and sponsors',
+    details: 'Share photos and a short thank-you note.',
+    daysBefore: -7,
+    priority: 'medium',
+  },
+  {
+    title: 'Publish the accounts',
+    details: 'Share a simple income and spending summary with the community.',
+    daysBefore: -14,
+    priority: 'medium',
+  },
+];
 
 /** Offline community-event plan, used when Gemini is unavailable. */
 export const communityTemplate: EventTemplate = {
   budget: [
-    share(
+    fixedCost(
       'venue',
       'Ground or hall',
       14,
-      false,
       'The site booking, often from a local body or society.',
     ),
-    share(
+    fixedCost(
       'permits',
       'Permits & permissions',
       4,
-      false,
       'Local permissions for public gatherings, sound and food.',
     ),
-    share(
-      'sound-light',
-      'Sound & lighting',
-      12,
-      false,
-      'Stage sound, lights and a backup generator.',
-    ),
-    share('rentals', 'Tents, stage & furniture', 10, false, 'Shade, seating and the stage.'),
-    share(
+    fixedCost('sound-light', 'Sound & lighting', 12, 'Stage sound, lights and a backup generator.'),
+    fixedCost('rentals', 'Tents, stage & furniture', 10, 'Shade, seating and the stage.'),
+    perGuestCost(
       'catering',
       'Food & refreshments',
       14,
-      true,
       'Refreshments for volunteers and attendees.',
     ),
-    share('decor', 'Decor & signage', 8, false, 'Entrance decor and clear direction signs.'),
-    share(
+    fixedCost('decor', 'Decor & signage', 8, 'Entrance decor and clear direction signs.'),
+    fixedCost(
       'entertainment',
       'Performances & activities',
       10,
-      false,
       'Performers, competitions and prizes.',
     ),
-    share('safety', 'Safety & first aid', 8, false, 'First aid, fire safety and crowd marshals.'),
-    share('marketing', 'Publicity & printing', 5, false, 'Posters, social media and flyers.'),
-    share('cleanup', 'Waste & cleanup', 5, false, 'Bins, segregation and a cleanup crew.'),
-    share(
+    fixedCost('safety', 'Safety & first aid', 8, 'First aid, fire safety and crowd marshals.'),
+    fixedCost('marketing', 'Publicity & printing', 5, 'Posters, social media and flyers.'),
+    fixedCost('cleanup', 'Waste & cleanup', 5, 'Bins, segregation and a cleanup crew.'),
+    fixedCost(
       'contingency',
       'Contingency buffer',
       10,
-      false,
       'A buffer for weather and last-minute needs.',
     ),
   ],
-  timeline: () => [
-    {
-      title: 'Form an organising committee and assign roles',
-      details: 'Name leads for permits, money, safety, programme and volunteers.',
-      daysBefore: 120,
-      priority: 'high',
-    },
-    {
-      title: 'Apply for local permits and permissions',
-      details: 'Check what your local authority needs for crowds, sound and food stalls.',
-      daysBefore: 90,
-      priority: 'high',
-    },
-    {
-      title: 'Book the ground or hall',
-      details: 'Confirm capacity, power, water and step-free access.',
-      daysBefore: 90,
-      priority: 'high',
-    },
-    {
-      title: 'Set the budget and sponsorship plan',
-      details: 'List costs and approach local businesses and residents for support.',
-      daysBefore: 75,
-      priority: 'medium',
-    },
-    {
-      title: 'Book sound, lighting and a generator',
-      details: 'Ask about noise limits and cut-off times.',
-      daysBefore: 60,
-      priority: 'medium',
-    },
-    {
-      title: 'Line up performers and competitions',
-      details: 'Mix acts for children, families and elders.',
-      daysBefore: 60,
-      priority: 'medium',
-    },
-    {
-      title: 'Recruit and organise volunteers',
-      details: 'Plan shifts for entry, stalls, safety and cleanup.',
-      daysBefore: 45,
-      priority: 'high',
-    },
-    {
-      title: 'Publicise the event',
-      details: 'Use posters, residents’ groups and social media.',
-      daysBefore: 30,
-      priority: 'medium',
-    },
-    {
-      title: 'Write the safety plan',
-      details: 'Cover first aid, fire extinguishers, crowd flow and lost-child points.',
-      daysBefore: 30,
-      priority: 'high',
-    },
-    {
-      title: 'Plan accessibility',
-      details: 'Arrange ramps, reserved seating and accessible toilets.',
-      daysBefore: 21,
-      priority: 'high',
-    },
-    {
-      title: 'Arrange waste segregation and cleanup',
-      details: 'Place labelled bins and agree who clears the site.',
-      daysBefore: 21,
-      priority: 'medium',
-    },
-    {
-      title: 'Brief volunteers and walk the site',
-      details: 'Share the run sheet, emergency contacts and exits.',
-      daysBefore: 3,
-      priority: 'high',
-    },
-    {
-      title: 'Set up the site',
-      details: 'Put up tents, stage, signs and bins.',
-      daysBefore: 1,
-      priority: 'high',
-    },
-    {
-      title: 'Run the event and keep a log',
-      details: 'Keep one coordinator free to handle problems.',
-      daysBefore: 0,
-      priority: 'high',
-    },
-    {
-      title: 'Clean up and return rentals',
-      details: 'Leave the site as you found it.',
-      daysBefore: -1,
-      priority: 'high',
-    },
-    {
-      title: 'Thank volunteers and sponsors',
-      details: 'Share photos and a short thank-you note.',
-      daysBefore: -7,
-      priority: 'medium',
-    },
-    {
-      title: 'Publish the accounts',
-      details: 'Share a simple income and spending summary with the community.',
-      daysBefore: -14,
-      priority: 'medium',
-    },
-  ],
+  timeline: () => TASKS,
   vendors: [
     {
       category: 'Sound & lighting',

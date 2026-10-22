@@ -175,13 +175,21 @@ export function updateVendor(
   });
 }
 
-/** Add a vendor type the plan does not have, to be booked by the given date. */
+/** When an edit is made, for edits that schedule something: today, the clock and new ids. */
+interface EditContext {
+  today: string;
+  now: Date;
+  newId: IdFactory;
+}
+
+/**
+ * Add a vendor type the plan does not have, to be booked by the given date: never
+ * after the event, and never before today.
+ */
 export function addCustomVendor(
   plan: Plan,
   input: { category: string; budgetKey: BudgetKey; bookBy: string },
-  newId: IdFactory,
-  today: string,
-  now: Date,
+  { today, now, newId }: EditContext,
 ): Plan {
   if (planIsFull(plan, 'vendors')) return plan;
   const bookDaysBefore = clampBookDays(diffDays(input.bookBy, plan.brief.date));

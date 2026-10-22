@@ -140,6 +140,24 @@ describe('normalizeRefine', () => {
     expect(result.sections.budget?.every((l) => l.estHigh <= 300)).toBe(true);
   });
 
+  it('sizes sections by the current brief when a brief change is rejected', () => {
+    const draft = aiPlanFor(weddingBrief);
+    const result = normalizeRefine(
+      {
+        message: 'm',
+        briefPatch: { days: 0, budget: 0 },
+        budget: draft.budget,
+        dayOf: [{ day: weddingBrief.days, startMinute: 600, title: 'Last day' }],
+      },
+      'all',
+      weddingBrief,
+      TODAY,
+    );
+    expect(result.briefPatch).toBeNull();
+    expect(result.sections.dayOf?.[0]?.day).toBe(weddingBrief.days);
+    expect(result.sections.budget?.some((line) => line.estHigh > 0)).toBe(true);
+  });
+
   it('rejects a malformed refinement', () => {
     expect(() => normalizeRefine({ nope: true }, 'all', birthdayBrief, TODAY)).toThrow(
       InvalidOutputError,

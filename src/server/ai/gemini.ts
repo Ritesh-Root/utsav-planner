@@ -1,3 +1,4 @@
+import type { GenerateContentResponse } from '@google/genai';
 import {
   ApiError,
   FinishReason,
@@ -101,6 +102,30 @@ export function toAiError(error: unknown, signal?: AbortSignal): AiError {
   return new AiError('network');
 }
 
+/** Tokens a response was billed for; Vertex leaves out the counts that are zero. */
+function readUsage(response: GenerateContentResponse): AiUsage {
+  const counts = response.usageMetadata ?? {};
+  return {
+    promptTokens: counts.promptTokenCount ?? 0,
+    outputTokens: counts.candidatesTokenCount ?? 0,
+    thoughtTokens: counts.thoughtsTokenCount ?? 0,
+    cachedTokens: counts.cachedContentTokenCount ?? 0,
+  };
+}
+
+/** The answer's text, or an `AiError` saying why there is nothing usable. */
+function readText(response: GenerateContentResponse, usage: AiUsage): string {
+  if (response.promptFeedback?.blockReason) throw new AiError('blocked', undefined, usage);
+  const finishReason = response.candidates?.[0]?.finishReason;
+  if (finishReason && BLOCKED_FINISH.has(finishReason)) {
+    throw new AiError('blocked', undefined, usage);
+  }
+  if (finishReason === FinishReason.MAX_TOKENS) throw new AiError('max-tokens', undefined, usage);
+  const text = response.text;
+  if (!text) throw new AiError('empty', undefined, usage);
+  return text;
+}
+
 /**
  * Gemini on Vertex AI. Authentication comes from the Cloud Run service account
  * (or local Application Default Credentials): there is no API key anywhere.
@@ -137,23 +162,8 @@ export function createGeminiClient(options: {
             abortSignal: signal,
           },
         });
-        const usage: AiUsage = {
-          promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
-          outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
-          thoughtTokens: response.usageMetadata?.thoughtsTokenCount ?? 0,
-          cachedTokens: response.usageMetadata?.cachedContentTokenCount ?? 0,
-        };
-        if (response.promptFeedback?.blockReason) throw new AiError('blocked', undefined, usage);
-        const finishReason = response.candidates?.[0]?.finishReason;
-        if (finishReason && BLOCKED_FINISH.has(finishReason)) {
-          throw new AiError('blocked', undefined, usage);
-        }
-        if (finishReason === FinishReason.MAX_TOKENS) {
-          throw new AiError('max-tokens', undefined, usage);
-        }
-        const text = response.text;
-        if (!text) throw new AiError('empty', undefined, usage);
-        return { text, usage };
+        const usage = readUsage(response);
+        return { text: readText(response, usage), usage };
       } catch (error) {
         throw toAiError(error, signal);
       }

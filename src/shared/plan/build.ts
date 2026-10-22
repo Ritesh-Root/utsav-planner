@@ -42,9 +42,15 @@ interface BudgetEntry {
   estHigh: number;
 }
 
-const CONTINGENCY_DEFAULTS = {
+/** The line `withContingency` adds when a plan has none. */
+const CONTINGENCY_ENTRY: BudgetEntry = {
+  key: 'contingency',
   category: 'Contingency buffer',
+  share: 0,
+  perGuest: false,
   rationale: 'A buffer for surprises, price changes and last-minute needs.',
+  estLow: 0,
+  estHigh: 0,
 };
 
 /** A budget line from the model, as a share to apportion. */
@@ -75,6 +81,32 @@ export function entryFromLine(line: BudgetLine): BudgetEntry {
   };
 }
 
+/** A line with its share, before amounts are apportioned. Locked lines keep their amount. */
+function draftLine(entry: BudgetEntry, shareBp: number, newId: IdFactory): BudgetLine {
+  const { previous } = entry;
+  return {
+    id: previous?.id ?? newId('budget'),
+    key: entry.key,
+    category: truncate(entry.category, LIMITS.shortText),
+    shareBp,
+    perGuest: entry.perGuest,
+    rationale: truncate(entry.rationale, LIMITS.mediumText),
+    estLow: entry.estLow,
+    estHigh: entry.estHigh,
+    amount: previous?.locked ? previous.amount : 0,
+    locked: previous?.locked ?? false,
+    actual: previous?.actual ?? 0,
+  };
+}
+
+/** The estimate in order and within bounds; without one, a range around the amount. */
+function estimateRange(line: BudgetLine, amount: number, cap: number) {
+  const estLow = toWholeAmount(Math.min(line.estLow, line.estHigh), cap);
+  const estHigh = toWholeAmount(Math.max(line.estLow, line.estHigh), cap);
+  if (estHigh > 0) return { estLow, estHigh };
+  return { estLow: Math.round(amount * 0.8), estHigh: Math.round(amount * 1.25) };
+}
+
 /**
  * Shares → basis points (with a 5–15% contingency), then exact amounts. Lines
  * the user locked keep their amount; previous ids and spend are preserved.
@@ -84,35 +116,16 @@ export function buildBudgetLines(
   total: number,
   newId: IdFactory,
 ): BudgetLine[] {
-  const { keys, bp } = withContingency(entries.map((e) => ({ key: e.key, share: e.share })));
-  const drafts: BudgetLine[] = keys.map((key, index) => {
-    const entry = entries[index];
-    const previous = entry?.previous;
-    return {
-      id: previous?.id ?? newId('budget'),
-      key: (entry?.key ?? key) as BudgetKey,
-      category: truncate(entry?.category ?? CONTINGENCY_DEFAULTS.category, LIMITS.shortText),
-      shareBp: bp[index] ?? 0,
-      perGuest: entry?.perGuest ?? false,
-      rationale: truncate(entry?.rationale ?? CONTINGENCY_DEFAULTS.rationale, LIMITS.mediumText),
-      estLow: entry?.estLow ?? 0,
-      estHigh: entry?.estHigh ?? 0,
-      amount: previous?.locked ? previous.amount : 0,
-      locked: previous?.locked ?? false,
-      actual: previous?.actual ?? 0,
-    };
-  });
+  const bp = withContingency(entries.map((e) => ({ key: e.key, share: e.share })));
+  // `bp` has one more place than `entries` when a contingency line was added.
+  const drafts = bp.map((shareBp, index) =>
+    draftLine(entries[index] ?? CONTINGENCY_ENTRY, shareBp, newId),
+  );
   const { amounts } = allocate(total, drafts);
   const cap = estimateCap(total);
   return drafts.map((line, index) => {
     const amount = amounts[index] ?? 0;
-    let low = toWholeAmount(Math.min(line.estLow, line.estHigh), cap);
-    let high = toWholeAmount(Math.max(line.estLow, line.estHigh), cap);
-    if (high === 0) {
-      low = Math.round(amount * 0.8);
-      high = Math.round(amount * 1.25);
-    }
-    return { ...line, amount, estLow: low, estHigh: high };
+    return { ...line, amount, ...estimateRange(line, amount, cap) };
   });
 }
 

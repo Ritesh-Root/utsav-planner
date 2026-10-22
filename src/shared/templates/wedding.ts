@@ -1,6 +1,6 @@
 import type { AiPlan, Brief } from '../schemas.js';
 import type { EventTemplate } from './types.js';
-import { at, share } from './types.js';
+import { at, fixedCost, perGuestCost } from './types.js';
 
 const tasks: AiPlan['timeline'] = [
   {
@@ -139,42 +139,28 @@ function foodIdea(brief: Brief): AiPlan['ideas'][number] {
 /** Offline wedding plan, used when Gemini is unavailable. */
 export const weddingTemplate: EventTemplate = {
   budget: [
-    share(
+    fixedCost(
       'venue',
       'Venue & booking',
       20,
-      false,
       'The venue usually sets the scale of everything else.',
     ),
-    share(
+    perGuestCost(
       'catering',
       'Catering & food',
       30,
-      true,
       'Food is the largest per-guest cost at most weddings.',
     ),
-    share('decor', 'Decor & flowers', 12, false, 'Mandap or stage, entrance and table decor.'),
-    share('photography', 'Photography & video', 9, false, 'Covers photos, video and an album.'),
-    share(
-      'attire',
-      'Outfits & jewellery',
-      8,
-      false,
-      'Outfits for the couple across the functions.',
-    ),
-    share('beauty', 'Makeup & mehendi', 3, false, 'Makeup, hair and mehendi artists.'),
-    share('entertainment', 'Music & entertainment', 5, false, 'DJ, band or performers.'),
-    share('invitations', 'Invitations', 2, true, 'Printed or digital invitations.'),
-    share('gifts', 'Return gifts & favours', 3, true, 'Small thank-you gifts for guests.'),
-    share('rituals', 'Ceremony & rituals', 2, false, 'Officiant fees and ceremony items.'),
-    share('transport', 'Transport & logistics', 2, false, 'Guest pickups and vendor logistics.'),
-    share(
-      'contingency',
-      'Contingency buffer',
-      8,
-      false,
-      'A buffer for surprises and price changes.',
-    ),
+    fixedCost('decor', 'Decor & flowers', 12, 'Mandap or stage, entrance and table decor.'),
+    fixedCost('photography', 'Photography & video', 9, 'Covers photos, video and an album.'),
+    fixedCost('attire', 'Outfits & jewellery', 8, 'Outfits for the couple across the functions.'),
+    fixedCost('beauty', 'Makeup & mehendi', 3, 'Makeup, hair and mehendi artists.'),
+    fixedCost('entertainment', 'Music & entertainment', 5, 'DJ, band or performers.'),
+    perGuestCost('invitations', 'Invitations', 2, 'Printed or digital invitations.'),
+    perGuestCost('gifts', 'Return gifts & favours', 3, 'Small thank-you gifts for guests.'),
+    fixedCost('rituals', 'Ceremony & rituals', 2, 'Officiant fees and ceremony items.'),
+    fixedCost('transport', 'Transport & logistics', 2, 'Guest pickups and vendor logistics.'),
+    fixedCost('contingency', 'Contingency buffer', 8, 'A buffer for surprises and price changes.'),
   ],
   timeline: (brief) => (brief.days > 1 ? [...tasks, multiDayTask] : tasks),
   vendors: [

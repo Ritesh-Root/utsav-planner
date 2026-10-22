@@ -3,13 +3,26 @@ import { useMemo, useState } from 'react';
 import { IDEA_CATEGORIES } from '../../shared/constants.js';
 import { LIMITS } from '../../shared/limits.js';
 import { addCustomIdea, planIsFull, randomId, toggleIdeaSaved } from '../../shared/plan.js';
-import type { IdeaCategory } from '../../shared/schemas.js';
+import type { Idea, IdeaCategory } from '../../shared/schemas.js';
 import type { FormError } from '../components/InlineForm';
-import { FormField, InlineForm } from '../components/InlineForm';
+import {
+  FormField,
+  InlineForm,
+  SelectField,
+  TextField,
+  fullPlanError,
+} from '../components/InlineForm';
+import { Panel } from '../components/Layout';
 import { COST_TIER_LABELS, IDEA_CATEGORY_LABELS, pluralize } from '../labels';
 import type { PanelProps } from './types';
 
 type Filter = IdeaCategory | 'all' | 'saved';
+
+function matches(idea: Idea, filter: Filter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'saved') return idea.saved;
+  return idea.category === filter;
+}
 
 function AddIdeaForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   const [title, setTitle] = useState('');
@@ -19,10 +32,7 @@ function AddIdeaForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
 
   const submit = () => {
     if (planIsFull(plan, 'ideas')) {
-      setError({
-        message: 'This plan already holds as many ideas as Utsav keeps. Remove one first.',
-        fields: [],
-      });
+      setError(fullPlanError('ideas'));
       return;
     }
     if (title.trim() === '') {
@@ -41,37 +51,21 @@ function AddIdeaForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   return (
     <InlineForm heading="Add your own idea" error={error} submitLabel="Save idea" onSubmit={submit}>
       <div className="field-row">
-        <FormField name="name" label="Idea">
-          {(control) => (
-            <input
-              {...control}
-              className="input"
-              maxLength={LIMITS.shortText}
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-              }}
-            />
-          )}
-        </FormField>
-        <FormField name="category" label="Kind">
-          {(control) => (
-            <select
-              {...control}
-              className="select"
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value as IdeaCategory);
-              }}
-            >
-              {IDEA_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {IDEA_CATEGORY_LABELS[c]}
-                </option>
-              ))}
-            </select>
-          )}
-        </FormField>
+        <TextField
+          name="name"
+          label="Idea"
+          maxLength={LIMITS.shortText}
+          value={title}
+          onChange={setTitle}
+        />
+        <SelectField
+          name="category"
+          label="Kind"
+          value={category}
+          options={IDEA_CATEGORIES}
+          optionLabel={(c) => IDEA_CATEGORY_LABELS[c]}
+          onChange={setCategory}
+        />
       </div>
       <FormField name="details" label="Details (optional)">
         {(control) => (
@@ -90,61 +84,101 @@ function AddIdeaForm({ plan, update }: Pick<PanelProps, 'plan' | 'update'>) {
   );
 }
 
-/** Personalised ideas to save, filter and refine, plus the user's own. */
-export default function IdeasPanel({ plan, update, refine }: PanelProps) {
-  const [filter, setFilter] = useState<Filter>('all');
-  const categories = useMemo(
-    () => [...new Set(plan.ideas.map((idea) => idea.category))],
-    [plan.ideas],
-  );
-  const savedCount = plan.ideas.filter((idea) => idea.saved).length;
-  const shown = plan.ideas.filter((idea) =>
-    filter === 'all' ? true : filter === 'saved' ? idea.saved : idea.category === filter,
-  );
-
-  const filters: { id: Filter; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'saved', label: `Saved (${savedCount})` },
-    ...categories.map((category) => ({ id: category, label: IDEA_CATEGORY_LABELS[category] })),
-  ];
-
+function IdeaCard({ idea, onToggleSaved }: { idea: Idea; onToggleSaved: () => void }) {
   return (
-    <section className="panel" aria-labelledby="ideas-title">
-      <div className="panel-head">
-        <h2 id="ideas-title" className="panel-title">
-          Personalised ideas
-        </h2>
+    <li className="inner idea span-6">
+      <span className="row-sub">{IDEA_CATEGORY_LABELS[idea.category]}</span>
+      <h3 className="row-title">{idea.title}</h3>
+      <p>{idea.description}</p>
+      <div className="idea-foot">
+        <span className="unit">
+          {COST_TIER_LABELS[idea.costTier]}
+          {idea.saved && <span className="pill pill-accent saved-pill">Saved</span>}
+        </span>
         <button
           type="button"
           className="btn btn-secondary btn-small"
-          onClick={() => {
-            refine(
-              'ideas',
-              savedCount > 0
-                ? 'Suggest more ideas like the ones I saved, and keep the saved ones.'
-                : 'Suggest fresh ideas that suit this event better.',
-            );
-          }}
+          aria-pressed={idea.saved}
+          aria-label={`Save: ${idea.title}`}
+          onClick={onToggleSaved}
         >
-          More ideas like these
+          Save
         </button>
       </div>
+    </li>
+  );
+}
+
+/** Filter buttons: all ideas, the saved ones, or one kind of idea. */
+function IdeaFilters({
+  ideas,
+  filter,
+  onFilter,
+}: {
+  ideas: readonly Idea[];
+  filter: Filter;
+  onFilter: (filter: Filter) => void;
+}) {
+  const filters = useMemo(() => {
+    const categories = [...new Set(ideas.map((idea) => idea.category))];
+    const saved = ideas.filter((idea) => idea.saved).length;
+    return [
+      { id: 'all' as const, label: 'All' },
+      { id: 'saved' as const, label: `Saved (${saved})` },
+      ...categories.map((category) => ({ id: category, label: IDEA_CATEGORY_LABELS[category] })),
+    ];
+  }, [ideas]);
+  return (
+    <div className="chips" role="group" aria-label="Show ideas">
+      {filters.map((f) => (
+        <button
+          key={f.id}
+          type="button"
+          className="btn btn-secondary btn-small"
+          aria-pressed={filter === f.id}
+          onClick={() => {
+            onFilter(f.id);
+          }}
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Personalised ideas to save, filter and refine, plus the user's own. */
+export default function IdeasPanel({ plan, update, refine }: PanelProps) {
+  const [filter, setFilter] = useState<Filter>('all');
+  const shown = plan.ideas.filter((idea) => matches(idea, filter));
+  const anySaved = plan.ideas.some((idea) => idea.saved);
+  const toggleSaved = (idea: Idea) => () => {
+    update(toggleIdeaSaved(plan, idea.id, new Date()), {
+      announcement: `${idea.title} ${idea.saved ? 'removed from' : 'saved to'} your ideas`,
+    });
+  };
+
+  const moreLikeThese = (
+    <button
+      type="button"
+      className="btn btn-secondary btn-small"
+      onClick={() => {
+        refine(
+          'ideas',
+          anySaved
+            ? 'Suggest more ideas like the ones I saved, and keep the saved ones.'
+            : 'Suggest fresh ideas that suit this event better.',
+        );
+      }}
+    >
+      More ideas like these
+    </button>
+  );
+
+  return (
+    <Panel id="ideas-title" title="Personalised ideas" action={moreLikeThese}>
       <p className="panel-figure">{pluralize(plan.ideas.length, 'idea')}</p>
-      <div className="chips" role="group" aria-label="Show ideas">
-        {filters.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            className="btn btn-secondary btn-small"
-            aria-pressed={filter === f.id}
-            onClick={() => {
-              setFilter(f.id);
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <IdeaFilters ideas={plan.ideas} filter={filter} onFilter={setFilter} />
       <p className="sr-only" aria-live="polite">
         Showing {pluralize(shown.length, 'idea')}
       </p>
@@ -155,34 +189,11 @@ export default function IdeasPanel({ plan, update, refine }: PanelProps) {
       ) : (
         <ul className="grid ideas-grid">
           {shown.map((idea) => (
-            <li key={idea.id} className="inner idea span-6">
-              <span className="row-sub">{IDEA_CATEGORY_LABELS[idea.category]}</span>
-              <h3 className="row-title">{idea.title}</h3>
-              <p>{idea.description}</p>
-              <div className="idea-foot">
-                <span className="unit">
-                  {COST_TIER_LABELS[idea.costTier]}
-                  {idea.saved && <span className="pill pill-accent saved-pill">Saved</span>}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  aria-pressed={idea.saved}
-                  aria-label={`Save: ${idea.title}`}
-                  onClick={() => {
-                    update(toggleIdeaSaved(plan, idea.id, new Date()), {
-                      announcement: `${idea.title} ${idea.saved ? 'removed from' : 'saved to'} your ideas`,
-                    });
-                  }}
-                >
-                  Save
-                </button>
-              </div>
-            </li>
+            <IdeaCard key={idea.id} idea={idea} onToggleSaved={toggleSaved(idea)} />
           ))}
         </ul>
       )}
       <AddIdeaForm plan={plan} update={update} />
-    </section>
+    </Panel>
   );
 }

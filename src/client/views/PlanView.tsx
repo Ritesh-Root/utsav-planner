@@ -1,21 +1,16 @@
-import { useCallback, useMemo, useState } from 'react';
+import type { RefObject } from 'react';
+import { useCallback, useState } from 'react';
 
-import { formatDate } from '../../shared/dates.js';
-import { computeInsights } from '../../shared/insights.js';
 import { LIMITS } from '../../shared/limits.js';
-import { formatMoney } from '../../shared/money.js';
 import type { Plan, RefineScope } from '../../shared/schemas.js';
-import { ApiError, requestPlan } from '../api';
 import { ConfirmDialog } from '../components/Dialog';
-import { Pill, Toast } from '../components/Display';
-import { EditDetailsDialog } from '../components/EditDetailsDialog';
-import { ExportMenu } from '../components/ExportMenu';
+import { Toast } from '../components/Display';
+import { PlanHeader } from '../components/PlanHeader';
 import type { RefineRequestState } from '../components/RefinePanel';
 import { RefinePanel } from '../components/RefinePanel';
 import { RoadToTheDay } from '../components/RoadToTheDay';
 import { Tabs } from '../components/Tabs';
 import { useDocumentTitle, usePageFocus, useToday } from '../hooks';
-import { EVENT_TYPE_LABELS } from '../labels';
 import BudgetPanel from '../panels/BudgetPanel';
 import IdeasPanel from '../panels/IdeasPanel';
 import OverviewPanel from '../panels/OverviewPanel';
@@ -44,23 +39,14 @@ const TAB_LABELS: Record<PlanTab, string> = {
   ideas: 'Ideas',
 };
 
-/** One event's workspace: the title row, the road to the day and the five tabs. */
-export default function PlanView({ id, tab }: { id: string; tab: PlanTab }) {
-  const today = useToday();
+type HeadingRef = RefObject<HTMLHeadingElement | null>;
+type Update = PanelProps['update'];
+
+/** Save a changed plan, announce it, and offer Undo through a toast when it can be undone. */
+function usePlanUpdate() {
   const store = usePlanStore();
   const announce = useAnnounce();
-  const plan = store.getPlan(id);
-  const heading = usePageFocus<HTMLHeadingElement>(`plan-${id}`);
-  const [refineRequest, setRefineRequest] = useState<RefineRequestState | null>(null);
-  const [refineHistory, setRefineHistory] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [confirming, setConfirming] = useState<'delete' | 'regenerate' | null>(null);
-  const [regenerating, setRegenerating] = useState(false);
-  useDocumentTitle(plan ? `${plan.brief.title}: ${TAB_LABELS[tab]}` : 'Plan not found');
-
-  const insights = useMemo(() => (plan ? computeInsights(plan, today) : []), [plan, today]);
-
   const update = useCallback(
     (next: Plan, options: UpdateOptions = {}) => {
       store.savePlan(
@@ -72,131 +58,148 @@ export default function PlanView({ id, tab }: { id: string; tab: PlanTab }) {
     },
     [store, announce],
   );
+  const closeToast = () => {
+    setToast(null);
+  };
+  return { update, toast, closeToast };
+}
 
+function UndoToast({
+  planId,
+  message,
+  onClose,
+  headingRef,
+}: {
+  planId: string;
+  message: string;
+  onClose: () => void;
+  headingRef: HeadingRef;
+}) {
+  const store = usePlanStore();
+  const announce = useAnnounce();
+  if (!store.canUndo(planId)) return null;
+  // The toast holding focus is about to go; keep the keyboard user on the page.
+  const close = () => {
+    onClose();
+    headingRef.current?.focus();
+  };
+  const undo = () => {
+    store.undo(planId);
+    announce('Change undone.');
+    close();
+  };
+  return <Toast message={message} action={{ label: 'Undo', run: undo }} onDismiss={close} />;
+}
+
+/** The refine dialog while a request is open, remembering earlier instructions for follow-ups. */
+function PlanRefinement({
+  plan,
+  today,
+  request,
+  onClose,
+  update,
+}: {
+  plan: Plan;
+  today: string;
+  request: RefineRequestState | null;
+  onClose: () => void;
+  update: Update;
+}) {
+  const [history, setHistory] = useState<string[]>([]);
+  if (!request) return null;
+  return (
+    <RefinePanel
+      key={request.nonce}
+      plan={plan}
+      today={today}
+      request={request}
+      history={history}
+      onAsked={(text) => {
+        setHistory((items) => [...items, text].slice(-LIMITS.previousInstructionsMax));
+      }}
+      onClose={onClose}
+      onApply={(proposed, summary) => {
+        onClose();
+        update(proposed, { undoable: true, announcement: `Changes applied. ${summary}` });
+      }}
+    />
+  );
+}
+
+function DeletePlan({ plan }: { plan: Plan }) {
+  const store = usePlanStore();
+  const announce = useAnnounce();
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <section className="danger-zone" aria-labelledby="danger-title">
+      <h2 id="danger-title" className="section-title">
+        Delete this plan
+      </h2>
+      <p className="panel-caption">
+        This removes the plan and everything you added to it from this browser.
+      </p>
+      <button
+        type="button"
+        className="btn btn-danger"
+        onClick={() => {
+          setConfirming(true);
+        }}
+      >
+        Delete plan
+      </button>
+      <ConfirmDialog
+        open={confirming}
+        title={`Delete ${plan.brief.title}?`}
+        message="The plan, your ticks, vendor notes and spending will be removed from this browser. This cannot be undone."
+        confirmLabel="Delete plan"
+        onCancel={() => {
+          setConfirming(false);
+        }}
+        onConfirm={() => {
+          store.removePlan(plan.id);
+          announce(`${plan.brief.title} deleted.`);
+          navigate({ name: 'home' });
+        }}
+      />
+    </section>
+  );
+}
+
+function Workspace({
+  plan,
+  tab,
+  headingRef,
+}: {
+  plan: Plan;
+  tab: PlanTab;
+  headingRef: HeadingRef;
+}) {
+  const today = useToday();
+  const { update, toast, closeToast } = usePlanUpdate();
+  const [refineRequest, setRefineRequest] = useState<RefineRequestState | null>(null);
   const refine = useCallback((scope: RefineScope, instruction = '') => {
     setRefineRequest({ scope, instruction, nonce: Date.now() });
   }, []);
-
   const goTo = useCallback(
     (next: PlanTab) => {
-      navigate({ name: 'plan', id, tab: next }, { replace: true });
+      navigate({ name: 'plan', id: plan.id, tab: next }, { replace: true });
     },
-    [id],
+    [plan.id],
   );
-
-  if (!plan && !store.ready) {
-    return (
-      <p className="meta" role="status">
-        Loading your plan…
-      </p>
-    );
-  }
-
-  if (!plan) {
-    return (
-      <div className="title-text">
-        <h1 ref={heading} tabIndex={-1} className="title">
-          Plan not found
-        </h1>
-        <p className="meta">It may have been deleted, or it was made in another browser.</p>
-        <p>
-          <a href="#/">Back to your plans</a>
-        </p>
-      </div>
-    );
-  }
-
-  const { brief } = plan;
-  const finding =
-    insights.find((insight) => insight.tone === 'alert' || insight.tone === 'warning') ??
-    insights[0];
   const Panel = PANELS[tab];
-
-  const regenerate = async () => {
-    setConfirming(null);
-    setRegenerating(true);
-    announce('Asking Gemini for a fresh plan…');
-    try {
-      const { plan: fresh } = await requestPlan(brief, today);
-      update(
-        { ...fresh, id: plan.id },
-        {
-          undoable: true,
-          announcement:
-            fresh.source === 'ai'
-              ? 'Fresh plan from Gemini.'
-              : 'AI is still unavailable; the template plan was kept.',
-        },
-      );
-    } catch (error) {
-      announce(
-        error instanceof ApiError ? error.message : 'Could not reach Utsav. Try again later.',
-        'assertive',
-      );
-    } finally {
-      setRegenerating(false);
-    }
-  };
 
   return (
     <>
-      <div className="title-row">
-        <div className="title-text">
-          <h1 ref={heading} tabIndex={-1} className="title">
-            {brief.title}
-          </h1>
-          <p className="meta">
-            {EVENT_TYPE_LABELS[brief.type]} · {formatDate(brief.date)}
-            {brief.days > 1 ? ` · ${brief.days} days` : ''} · {brief.location} · {brief.guests}{' '}
-            guests · {formatMoney(brief.budget, brief.currency)}
-          </p>
-          {finding && <p className="finding">{finding.text}</p>}
-          <p className="source-line">
-            {plan.source === 'ai' ? (
-              <Pill tone="accent">Drafted with Gemini</Pill>
-            ) : (
-              <>
-                <Pill tone="warning">Template plan</Pill>
-                <span className="row-sub">{plan.fallbackReason}</span>
-                <button
-                  type="button"
-                  className="link-button"
-                  disabled={regenerating}
-                  onClick={() => {
-                    setConfirming('regenerate');
-                  }}
-                >
-                  {regenerating ? 'Asking Gemini…' : 'Try AI again'}
-                </button>
-              </>
-            )}
-          </p>
-        </div>
-        <div className="actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              refine('all');
-            }}
-          >
-            Refine with AI
-          </button>
-          <ExportMenu plan={plan} />
-          <button
-            type="button"
-            className="btn btn-quiet"
-            onClick={() => {
-              setEditing(true);
-            }}
-          >
-            Edit details
-          </button>
-        </div>
-      </div>
-
+      <PlanHeader
+        plan={plan}
+        today={today}
+        update={update}
+        headingRef={headingRef}
+        onRefine={() => {
+          refine('all');
+        }}
+      />
       <RoadToTheDay plan={plan} today={today} />
-
       <Tabs
         items={PLAN_TABS.map((t) => ({ id: t, label: TAB_LABELS[t] }))}
         selected={tab}
@@ -207,100 +210,47 @@ export default function PlanView({ id, tab }: { id: string; tab: PlanTab }) {
       <div id="plan-panel" role="tabpanel" aria-labelledby={`plan-tab-${tab}`}>
         <Panel plan={plan} today={today} update={update} refine={refine} goTo={goTo} />
       </div>
-
-      <section className="danger-zone" aria-labelledby="danger-title">
-        <h2 id="danger-title" className="section-title">
-          Delete this plan
-        </h2>
-        <p className="panel-caption">
-          This removes the plan and everything you added to it from this browser.
-        </p>
-        <button
-          type="button"
-          className="btn btn-danger"
-          onClick={() => {
-            setConfirming('delete');
-          }}
-        >
-          Delete plan
-        </button>
-      </section>
-
-      {refineRequest && (
-        <RefinePanel
-          key={refineRequest.nonce}
-          plan={plan}
-          today={today}
-          request={refineRequest}
-          history={refineHistory}
-          onAsked={(text) => {
-            setRefineHistory((items) => [...items, text].slice(-LIMITS.previousInstructionsMax));
-          }}
-          onClose={() => {
-            setRefineRequest(null);
-          }}
-          onApply={(proposed, summary) => {
-            setRefineRequest(null);
-            update(proposed, { undoable: true, announcement: `Changes applied. ${summary}` });
-          }}
-        />
-      )}
-      {editing && (
-        <EditDetailsDialog
-          plan={plan}
-          today={today}
-          onClose={() => {
-            setEditing(false);
-          }}
-          onSave={(next) => {
-            setEditing(false);
-            update(next, { undoable: true, announcement: 'Event details saved.' });
-          }}
-        />
-      )}
-      <ConfirmDialog
-        open={confirming === 'delete'}
-        title={`Delete ${brief.title}?`}
-        message="The plan, your ticks, vendor notes and spending will be removed from this browser. This cannot be undone."
-        confirmLabel="Delete plan"
-        onCancel={() => {
-          setConfirming(null);
+      <DeletePlan plan={plan} />
+      <PlanRefinement
+        plan={plan}
+        today={today}
+        request={refineRequest}
+        onClose={() => {
+          setRefineRequest(null);
         }}
-        onConfirm={() => {
-          store.removePlan(plan.id);
-          announce(`${brief.title} deleted.`);
-          navigate({ name: 'home' });
-        }}
+        update={update}
       />
-      <ConfirmDialog
-        open={confirming === 'regenerate'}
-        title="Replace this plan with a fresh AI plan?"
-        message="Gemini will draft a new plan from the same details. Your ticks and vendor notes on this template plan will be replaced; you can undo afterwards."
-        confirmLabel="Replace plan"
-        onCancel={() => {
-          setConfirming(null);
-        }}
-        onConfirm={() => void regenerate()}
-      />
-      {toast && store.canUndo(plan.id) && (
-        <Toast
-          message={toast}
-          action={{
-            label: 'Undo',
-            run: () => {
-              store.undo(plan.id);
-              setToast(null);
-              announce('Change undone.');
-              // The toast holding focus is about to go; keep the keyboard user on the page.
-              heading.current?.focus();
-            },
-          }}
-          onDismiss={() => {
-            setToast(null);
-            heading.current?.focus();
-          }}
-        />
+      {toast && (
+        <UndoToast planId={plan.id} message={toast} onClose={closeToast} headingRef={headingRef} />
       )}
     </>
+  );
+}
+
+/** One event's workspace: the title row, the road to the day and the five tabs. */
+export default function PlanView({ id, tab }: { id: string; tab: PlanTab }) {
+  const store = usePlanStore();
+  const plan = store.getPlan(id);
+  const heading = usePageFocus<HTMLHeadingElement>(`plan-${id}`);
+  useDocumentTitle(plan ? `${plan.brief.title}: ${TAB_LABELS[tab]}` : 'Plan not found');
+
+  if (plan) return <Workspace plan={plan} tab={tab} headingRef={heading} />;
+  if (!store.ready) {
+    return (
+      <p className="meta" role="status">
+        Loading your plan…
+      </p>
+    );
+  }
+  return (
+    <div className="title-text">
+      <h1 ref={heading} tabIndex={-1} className="title">
+        Plan not found
+      </h1>
+      <p className="meta">It may have been deleted, or it was made in another browser.</p>
+      <p>
+        <a href="#/">Back to your plans</a>
+      </p>
+    </div>
   );
 }

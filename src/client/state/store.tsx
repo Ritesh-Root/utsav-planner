@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { Dispatch, ReactNode, RefObject } from 'react';
 import {
   createContext,
   useCallback,
@@ -91,40 +91,25 @@ function sameList(a: readonly Plan[], b: readonly Plan[]): boolean {
 /** Reading saved plans needs zod; load it after the first screen has painted. */
 const loadSavedPlans = () => import('../storage').then((storage) => storage.readPlans());
 
-export function PlanStoreProvider({
-  children,
-  initialPlans,
-}: {
-  children: ReactNode;
-  /** Plans to start with (tests); when omitted, saved plans load in the background. */
-  initialPlans?: Plan[];
-}) {
+interface SaveQueue {
+  /** The list this tab last wrote, or last read from another tab's save. */
+  lastWrittenRef: RefObject<Plan[] | null>;
+  /** A list waiting to be written. */
+  pendingRef: RefObject<Plan[] | null>;
+  /** Write the pending list now. */
+  flush: () => void;
+}
+
+/** Writes to localStorage, at once when the page is hidden or closed so no edit is lost. */
+function useSaveQueue(): SaveQueue {
   const announce = useAnnounce();
-  const [state, dispatch] = useReducer(storeReducer, undefined, (): StoreState => ({
-    plans: initialPlans ?? [],
-    history: {},
-    ready: initialPlans !== undefined,
-  }));
-
-  // What storage held when this tab started: the list that needs no writing back.
-  const baseline = useRef<Plan[] | null>(initialPlans ?? null);
-  useEffect(() => {
-    if (initialPlans !== undefined) return;
-    void loadSavedPlans().then((plans) => {
-      baseline.current = plans;
-      dispatch({ type: 'loaded', plans });
-    });
-  }, [initialPlans]);
-
-  // Write only after a change: writing the list we just loaded could overwrite
-  // newer plans saved by another tab in the meantime.
-  const lastWritten = useRef<Plan[] | null>(null);
-  const pending = useRef<Plan[] | null>(null);
+  const lastWrittenRef = useRef<Plan[] | null>(null);
+  const pendingRef = useRef<Plan[] | null>(null);
   const flush = useCallback(() => {
-    const plans = pending.current;
+    const plans = pendingRef.current;
     if (!plans) return;
-    pending.current = null;
-    lastWritten.current = plans;
+    pendingRef.current = null;
+    lastWrittenRef.current = plans;
     if (!writePlans(plans)) {
       announce(
         'Utsav couldn’t save in this browser. Download your plans from Settings to keep a copy.',
@@ -133,27 +118,6 @@ export function PlanStoreProvider({
     }
   }, [announce]);
 
-  const started = useRef(false);
-  useEffect(() => {
-    if (!state.ready) return undefined;
-    if (!started.current) {
-      started.current = true;
-      // Skip the write only when nothing was made or imported while saved plans loaded.
-      const saved = baseline.current;
-      if (saved && sameList(state.plans, saved)) return undefined;
-    }
-    if (state.plans === lastWritten.current) {
-      pending.current = null;
-      return undefined;
-    }
-    pending.current = state.plans;
-    const timer = window.setTimeout(flush, SAVE_DELAY_MS);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [state.plans, state.ready, flush]);
-
-  // Never lose the last edit: write at once when the page is hidden or closed.
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === 'hidden') flush();
@@ -167,14 +131,48 @@ export function PlanStoreProvider({
     };
   }, [flush]);
 
-  // Keep several open tabs in step: another tab's save replaces this tab's list.
+  return useMemo(() => ({ lastWrittenRef, pendingRef, flush }), [flush]);
+}
+
+/**
+ * Queue a write shortly after each change. Never write the list just loaded: that
+ * could overwrite newer plans saved by another tab in the meantime.
+ */
+function useSaveOnChange(
+  state: StoreState,
+  baselineRef: RefObject<Plan[] | null>,
+  { lastWrittenRef, pendingRef, flush }: SaveQueue,
+) {
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (!state.ready) return undefined;
+    if (!startedRef.current) {
+      startedRef.current = true;
+      // Skip the write only when nothing was made or imported while saved plans loaded.
+      const saved = baselineRef.current;
+      if (saved && sameList(state.plans, saved)) return undefined;
+    }
+    if (state.plans === lastWrittenRef.current) {
+      pendingRef.current = null;
+      return undefined;
+    }
+    pendingRef.current = state.plans;
+    const timer = window.setTimeout(flush, SAVE_DELAY_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [state.plans, state.ready, baselineRef, lastWrittenRef, pendingRef, flush]);
+}
+
+/** Keep several open tabs in step: another tab's save replaces this tab's list. */
+function useOtherTabs(dispatch: Dispatch<StoreAction>, { lastWrittenRef, pendingRef }: SaveQueue) {
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== PLANS_KEY) return;
       void loadSavedPlans().then((plans) => {
         // The other tab's list is now the newest: drop any write this tab still had queued.
-        pending.current = null;
-        lastWritten.current = plans;
+        pendingRef.current = null;
+        lastWrittenRef.current = plans;
         dispatch({ type: 'replace-all', plans });
       });
     };
@@ -182,33 +180,68 @@ export function PlanStoreProvider({
     return () => {
       window.removeEventListener('storage', onStorage);
     };
-  }, []);
+  }, [dispatch, lastWrittenRef, pendingRef]);
+}
 
-  const savePlan = useCallback((plan: Plan, options: { undoable?: boolean } = {}) => {
-    dispatch({ type: 'save', plan, undoable: options.undoable ?? false });
-  }, []);
-  const removePlan = useCallback((id: string) => {
-    dispatch({ type: 'remove', id });
-  }, []);
-  const undo = useCallback((id: string) => {
-    dispatch({ type: 'undo', id });
-  }, []);
-  const replaceAll = useCallback((plans: Plan[]) => {
-    dispatch({ type: 'replace-all', plans });
-  }, []);
+/** The store's actions; each is stable, so components using them don't re-render needlessly. */
+function useStoreActions(dispatch: Dispatch<StoreAction>) {
+  return useMemo(
+    () => ({
+      savePlan: (plan: Plan, options: { undoable?: boolean } = {}) => {
+        dispatch({ type: 'save', plan, undoable: options.undoable ?? false });
+      },
+      removePlan: (id: string) => {
+        dispatch({ type: 'remove', id });
+      },
+      undo: (id: string) => {
+        dispatch({ type: 'undo', id });
+      },
+      replaceAll: (plans: Plan[]) => {
+        dispatch({ type: 'replace-all', plans });
+      },
+    }),
+    [dispatch],
+  );
+}
+
+export function PlanStoreProvider({
+  children,
+  initialPlans,
+}: {
+  children: ReactNode;
+  /** Plans to start with (tests); when omitted, saved plans load in the background. */
+  initialPlans?: Plan[];
+}) {
+  const [state, dispatch] = useReducer(storeReducer, undefined, (): StoreState => ({
+    plans: initialPlans ?? [],
+    history: {},
+    ready: initialPlans !== undefined,
+  }));
+
+  // What storage held when this tab started: the list that needs no writing back.
+  const baselineRef = useRef<Plan[] | null>(initialPlans ?? null);
+  useEffect(() => {
+    if (initialPlans !== undefined) return;
+    void loadSavedPlans().then((plans) => {
+      baselineRef.current = plans;
+      dispatch({ type: 'loaded', plans });
+    });
+  }, [initialPlans]);
+
+  const queue = useSaveQueue();
+  useSaveOnChange(state, baselineRef, queue);
+  useOtherTabs(dispatch, queue);
+  const actions = useStoreActions(dispatch);
 
   const value = useMemo<PlanStore>(
     () => ({
+      ...actions,
       plans: state.plans,
       ready: state.ready,
       getPlan: (id) => state.plans.find((p) => p.id === id),
-      savePlan,
-      removePlan,
-      undo,
       canUndo: (id) => (state.history[id]?.length ?? 0) > 0,
-      replaceAll,
     }),
-    [state, savePlan, removePlan, undo, replaceAll],
+    [state, actions],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

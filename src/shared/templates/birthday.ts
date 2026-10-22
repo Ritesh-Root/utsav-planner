@@ -1,6 +1,6 @@
 import type { AiPlan, Brief } from '../schemas.js';
 import type { EventTemplate } from './types.js';
-import { at, share } from './types.js';
+import { at, fixedCost, perGuestCost } from './types.js';
 
 function ageGroup(brief: Brief): 'kid' | 'teen' | 'adult' | 'milestone' {
   const age = brief.honoreeAge;
@@ -68,20 +68,19 @@ const ACTIVITY_IDEAS: Record<ReturnType<typeof ageGroup>, AiPlan['ideas'][number
 /** Offline birthday plan, used when Gemini is unavailable. */
 export const birthdayTemplate: EventTemplate = {
   budget: [
-    share(
+    fixedCost(
       'venue',
       'Venue or home setup',
       15,
-      false,
       'A hall, restaurant space or setting up at home.',
     ),
-    share('catering', 'Food & snacks', 30, true, 'Food is the main per-guest cost.'),
-    share('cake', 'Cake & desserts', 8, false, 'The cake plus a few desserts.'),
-    share('decor', 'Decorations', 12, false, 'Balloons, banners and a theme backdrop.'),
-    share('entertainment', 'Games & entertainment', 15, false, 'Activities or an entertainer.'),
-    share('gifts', 'Return gifts', 8, true, 'Small thank-you gifts for guests.'),
-    share('photography', 'Photos', 4, false, 'A photographer or a photo-booth setup.'),
-    share('contingency', 'Contingency buffer', 8, false, 'A buffer for last-minute needs.'),
+    perGuestCost('catering', 'Food & snacks', 30, 'Food is the main per-guest cost.'),
+    fixedCost('cake', 'Cake & desserts', 8, 'The cake plus a few desserts.'),
+    fixedCost('decor', 'Decorations', 12, 'Balloons, banners and a theme backdrop.'),
+    fixedCost('entertainment', 'Games & entertainment', 15, 'Activities or an entertainer.'),
+    perGuestCost('gifts', 'Return gifts', 8, 'Small thank-you gifts for guests.'),
+    fixedCost('photography', 'Photos', 4, 'A photographer or a photo-booth setup.'),
+    fixedCost('contingency', 'Contingency buffer', 8, 'A buffer for last-minute needs.'),
   ],
   timeline: () => [
     {
